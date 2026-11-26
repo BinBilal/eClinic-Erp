@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --color-navy: #1E396A;
+    --color-orange: #F05D21;
+    --color-blue: #396BA4;
+    --color-surface: #FFFFFF;
+    --color-canvas: #F4F6F9;
+    --color-sidebar: #F4F6F9;
+    --color-sidebar-card: #FFFFFF;
+    --color-sidebar-text: #1E396A;
+    --erp-border: #E2E8F0;
+    --erp-text: #0F172A;
+    --erp-text-muted: #64748B;
+    --erp-heading: #1E396A;
+    color-scheme: light;
+  }
+
+  .dark {
+    --color-surface: #111B2E;
+    --color-canvas: #0B1220;
+    --color-sidebar: #0F1E3A;
+    --color-sidebar-card: #0B1730;
+    --color-sidebar-text: #F1F5F9;
+    --erp-border: #1E293B;
+    --erp-text: #F1F5F9;
+    --erp-text-muted: #94A3B8;
+    --erp-heading: #E2E8F0;
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    background-color: var(--color-canvas);
+    color: var(--erp-text);
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-mono, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+
+  .dark input:not([type="checkbox"]):not([type="radio"]),
+  .dark select,
+  .dark textarea {
+    background-color: #0D1628;
+    border-color: #334155;
+    color: #F1F5F9;
+  }
+
+  .dark input:not([type="checkbox"]):not([type="radio"])::placeholder,
+  .dark textarea::placeholder {
+    color: #64748B;
+  }
+}
+
+/* Smooth print styles for invoices and laboratory reports */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

@@ -1,0 +1,1167 @@
+# ePharmacy ERP Platform
+# COMPLETE INTERACTIVE DEMO — MASTER PROMPT
+
+**Company:** MI'AH ICT Solutions  
+**Product:** ePharmacy ERP Platform  
+**Version:** V0.0 Demo  
+**Purpose:** Realistic, Fully Interactive Product Demonstration
+
+---
+
+# 1. YOUR ROLE
+
+Act as a senior product designer, UI/UX designer, frontend engineer, ERP product architect, and full-stack prototype developer.
+
+Your task is to build a complete, professional, interactive DEMO of the ePharmacy ERP Platform developed by MI'AH ICT Solutions.
+
+This is not a simple landing page, static dashboard, or collection of disconnected screens.
+
+Build a realistic demonstration of the actual intended commercial product.
+
+The Demo must represent the real ePharmacy ERP Platform in:
+
+- Visual design.
+- Branding.
+- Colors.
+- Logo usage.
+- Light and Dark Themes.
+- Page layouts.
+- Dashboard structures.
+- Navigation.
+- Business workflows.
+- Forms.
+- Tables.
+- Charts.
+- User interactions.
+- User experience.
+- Module organization.
+
+**The Demo must look and feel like the real production product.**
+
+The only difference should be the underlying data and infrastructure: use realistic simulated data and demo interactions instead of real production records, external services, or live financial transactions.
+
+Do not simplify the UI merely because this is a Demo.
+
+# 2. PRODUCT SCOPE
+
+The Demo must contain exactly four major product experiences:
+
+1. Public Website
+2. Platform Super Admin Dashboard
+3. Pharmacy Admin Dashboard
+4. Wholesaler / Distributor Admin Dashboard
+
+All four experiences must be implemented and accessible within one coherent Demo application.
+
+Do not create separate staff dashboards.
+
+Do not introduce staff-specific login experiences.
+
+Do not add a marketplace or Pharmacy–Wholesaler ordering functionality.
+
+# 3. OFFICIAL BRANDING AND DESIGN SYSTEM
+
+This section is mandatory.
+
+Use the same approved design direction, branding, colors, and logo throughout the entire application.
+
+## 3.1 Official Logo
+
+Use the actual official MI'AH ICT logo asset previously supplied and used in the agreed designs.
+
+**Important: The supplied logo has a transparent background.**
+
+Requirements:
+
+- Use the original supplied logo image or vector asset.
+- Preserve its transparent background.
+- The area behind the logo must naturally display the background color of its parent component.
+- If the logo is placed on a navy sidebar, its transparent areas must show the same navy sidebar background.
+- If the logo is placed on a white surface, its transparent areas must show the white surface.
+- If the logo is placed on a dark-theme surface, its transparent areas must show that dark-theme surface.
+- Do not add a white, black, colored, or artificial background behind the logo.
+- Do not put the logo inside an unnecessary background container.
+- Do not recreate the logo using text.
+- Do not replace it with a generic icon.
+- Do not generate an alternative logo.
+- Do not stretch, crop, distort, or change its proportions.
+- Do not modify the original logo colors.
+- Do not remove its transparency.
+- Use consistent logo placement across the Public Website and all dashboards.
+
+If the original logo asset is not available in the development environment, request the original asset rather than inventing a replacement.
+
+## 3.2 Approved Color Palette
+
+Use these exact approved brand colors:
+
+| Color | Hex | Purpose |
+|---|---|---|
+| Primary Navy | #1E396A | Primary branding, sidebar and navigation |
+| Orange | #F05D21 | Primary actions, highlights and active accents |
+| Secondary Blue | #396BA4 | Secondary actions, links and charts |
+| White | #FFFFFF | Light-theme cards and surfaces |
+| Light Gray | #F4F6F9 | Light-theme dashboard background |
+
+Use appropriate neutral gray shades for borders, secondary text, separators, and disabled states.
+
+Do not introduce a completely different brand color scheme.
+
+Do not randomly change brand colors between dashboards.
+
+Use consistent status colors for:
+
+- Success.
+- Warning.
+- Error.
+- Pending.
+- Information.
+
+## 3.3 Design Direction
+
+Follow the previously agreed modern Nexora CRM-inspired ERP design.
+
+The visual style must be:
+
+- Modern.
+- Professional.
+- Clean.
+- Spacious.
+- Consistent.
+- Business-oriented.
+- Responsive.
+- Easy to navigate.
+
+### Dashboard layout
+
+All dashboards should share the same design language.
+
+**Sidebar**
+- Navy background in the approved light-theme dashboard design.
+- Official transparent logo.
+- Dashboard-specific navigation.
+- Clear active navigation indicator.
+- Expandable/collapsible behavior.
+- Appropriate icons.
+- Consistent spacing.
+
+**Topbar**
+- Page title or breadcrumb.
+- Search field.
+- Notifications.
+- Theme Toggle.
+- User profile.
+- Relevant account controls.
+
+**Main content**
+- Light-gray background in Light Theme.
+- Appropriate dark background in Dark Theme.
+- White cards in Light Theme.
+- Dark surface cards in Dark Theme.
+- KPI cards.
+- Tables.
+- Charts.
+- Filters.
+- Action buttons.
+- Consistent margins and spacing.
+
+Use a professional typography system and consistent typography hierarchy.
+
+Avoid oversized headings, unnecessary gradients, excessive shadows, decorative animations, and cluttered layouts.
+
+# 4. LIGHT AND DARK THEMES
+
+Theme support is mandatory across the entire application.
+
+The Demo must provide two complete themes:
+
+1. Light Theme.
+2. Dark Theme.
+
+## 4.1 Default Theme
+
+**Light Theme must be the default theme.**
+
+When a user opens the Demo for the first time, the application must load in Light Theme.
+
+Do not default to Dark Theme based on the device's operating system preference.
+
+## 4.2 Theme Toggle
+
+Provide an accessible Light/Dark Theme Toggle in the Topbar.
+
+The control must:
+
+- Clearly indicate the current theme.
+- Allow switching between Light and Dark.
+- Work across all four product experiences.
+- Update the interface immediately.
+- Preserve the selected theme while navigating between pages.
+- Preserve the selected theme after refreshing or reopening the Demo, where local persistence is available.
+
+Use appropriate sun and moon icons.
+
+## 4.3 Light Theme Design
+
+Light Theme must follow the previously agreed design.
+
+Use:
+
+- Main background: #F4F6F9.
+- Card background: #FFFFFF.
+- Primary Navy: #1E396A.
+- Orange Accent: #F05D21.
+- Secondary Blue: #396BA4.
+- Neutral dark text.
+- Subtle gray borders and separators.
+
+Maintain readable contrast and professional visual hierarchy.
+
+## 4.4 Dark Theme Design
+
+Dark Theme must be a complete, professionally designed alternative to Light Theme.
+
+Use:
+
+- Dark main backgrounds.
+- Dark card and panel surfaces.
+- Appropriate contrasting text.
+- Subtle borders and separators.
+- Readable input fields and tables.
+- Clearly visible buttons and active navigation states.
+- Accessible status indicators.
+
+Retain the official brand colors:
+
+- Primary Navy: #1E396A.
+- Orange Accent: #F05D21.
+- Secondary Blue: #396BA4.
+
+Adapt neutral backgrounds and text colors to support Dark Theme without changing the brand identity.
+
+Do not simply invert every color.
+
+Do not use pure black everywhere.
+
+Do not make text, borders, icons, charts, or inputs difficult to see.
+
+## 4.5 Theme Consistency
+
+Both themes must be supported by:
+
+- Public Website.
+- Authentication pages.
+- Super Admin Dashboard.
+- Pharmacy Dashboard.
+- Wholesaler Dashboard.
+- Sidebars.
+- Topbars.
+- Cards.
+- Tables.
+- Charts.
+- Forms.
+- Modals.
+- Dropdowns.
+- Notifications.
+- Confirmation dialogs.
+- Empty states.
+- Error states.
+- Loading states.
+
+No page should remain in Light Theme when the user has selected Dark Theme, or vice versa.
+
+Use a centralized theme system with reusable design tokens or CSS variables.
+
+Do not implement theme colors separately and inconsistently in individual components.
+
+# 5. PUBLIC WEBSITE
+
+Build a complete public-facing website.
+
+The Public Website must be visually consistent with MI'AH ICT Solutions branding while having a professional marketing website layout rather than an admin dashboard layout.
+
+It must support both Light and Dark Themes.
+
+## 5.1 Navigation
+
+Include:
+
+- Home.
+- About Us.
+- Features.
+- Solutions.
+- Contact Us.
+- Apply Now.
+- Login.
+- Theme Toggle.
+
+## 5.2 Home Page
+
+Include:
+
+- Professional hero section.
+- Clear ePharmacy ERP product introduction.
+- Strong call-to-action.
+- Pharmacy and Wholesaler solution highlights.
+- Key platform features.
+- Business benefits.
+- Platform workflow explanation.
+- Professional feature illustrations or product previews.
+- Footer with company information and useful links.
+
+## 5.3 About Us
+
+Explain:
+
+- MI'AH ICT Solutions.
+- The purpose of the ePharmacy ERP Platform.
+- The problems the platform addresses.
+- Its target business users.
+- Its vision and value.
+
+## 5.4 Features
+
+Present the actual platform capabilities, including:
+
+- Medicine and Product Management.
+- Inventory Management.
+- Batch and Expiry Management.
+- Sales and POS.
+- Purchasing Management.
+- Finance Management.
+- Reporting and Analytics.
+- Laboratory Reports.
+- Notifications and Alerts.
+- Secure Business Management.
+
+## 5.5 Solutions
+
+Present two main solutions:
+
+**For Pharmacies**
+- Pharmacy operational management.
+- Medicine inventory.
+- Sales and POS.
+- Purchasing.
+- Finance.
+- Laboratory reports.
+
+**For Wholesalers / Distributors**
+- Pharmaceutical product management.
+- Inventory and batch tracking.
+- Wholesale sales.
+- Purchasing.
+- Customer and supplier management.
+- Finance and reporting.
+
+## 5.6 Contact Us
+
+Include:
+
+- Contact form.
+- Name.
+- Email.
+- Phone.
+- Subject.
+- Message.
+- Company contact information.
+
+The form must have realistic validation and demo submission behavior.
+
+## 5.7 Apply Now
+
+Provide a complete demo application process.
+
+The applicant must select:
+
+- Pharmacy.
+- Wholesaler / Distributor.
+
+Display the relevant application form according to the selected business type.
+
+Include realistic fields such as:
+
+- Business Name.
+- Business Type.
+- Owner / Authorized Contact.
+- Email.
+- Phone.
+- Business Address.
+- Business Registration Information.
+- Other relevant business details.
+
+Validate the form and provide a confirmation after submission.
+
+Generate a simulated application reference number.
+
+## 5.8 Application Status
+
+Allow an applicant to enter their application reference number and view a simulated application status.
+
+Possible statuses:
+
+- Submitted.
+- Under Review.
+- Approved.
+- Rejected.
+
+## 5.9 Footer
+
+Include:
+
+- Company branding.
+- Useful navigation links.
+- Contact information.
+- Privacy Policy.
+- Terms & Conditions.
+- Copyright information.
+
+## 5.10 Public Website Language
+
+All public website content must be written in correct, natural, understandable Somali.
+
+Keep navigation page names in English.
+
+Do not introduce a language selector.
+
+# 6. PLATFORM SUPER ADMIN DASHBOARD
+
+Create a complete platform-level administrative dashboard for MI'AH ICT Solutions.
+
+This is not a Pharmacy Dashboard.
+
+It must focus on managing the entire ePharmacy platform.
+
+It must support both Light and Dark Themes.
+
+## 6.1 Sidebar Navigation
+
+Include:
+
+- Dashboard.
+- Applications.
+- Tenants.
+  - All Tenants.
+  - Pharmacies.
+  - Wholesalers.
+- Account Management.
+- Reports.
+- Notifications.
+- Audit Logs.
+- File Management.
+- System Configuration.
+- Search.
+- Settings.
+
+## 6.2 Dashboard Overview
+
+Include realistic KPI cards:
+
+- Total Tenants.
+- Active Pharmacies.
+- Active Wholesalers.
+- Pending Applications.
+- Approved Applications.
+- Rejected Applications.
+
+Include:
+
+- Tenant Growth Chart.
+- Applications Overview.
+- Pharmacy vs Wholesaler Distribution.
+- Recent Applications.
+- Recent Platform Activities.
+- Notifications and Alerts.
+
+## 6.3 Application Management
+
+Build a functional application management experience.
+
+Include:
+
+- Application list.
+- Search.
+- Filters.
+- Application status.
+- Business type.
+- Submission date.
+- Application details.
+
+Provide actions:
+
+- View Application.
+- Verify Information.
+- Approve.
+- Reject.
+
+The approval workflow must simulate tenant creation and initial account provisioning.
+
+The rejection workflow must allow the administrator to enter a reason.
+
+Update the simulated application status after actions.
+
+## 6.4 Tenant Management
+
+Include:
+
+- All Tenants.
+- Pharmacy Tenants.
+- Wholesaler Tenants.
+- Tenant details.
+- Business information.
+- Tenant status.
+- Creation date.
+- Tenant activity overview.
+
+Provide relevant administrative actions such as viewing tenant details and managing tenant status.
+
+## 6.5 Account Management
+
+Demonstrate:
+
+- Initial account creation.
+- Account details.
+- Account status.
+- Password reset simulation.
+- First-login password-change requirement.
+
+Do not expose plaintext passwords in account tables or logs.
+
+## 6.6 Reports
+
+Include realistic platform reports:
+
+- Tenant Reports.
+- Application Reports.
+- Business Distribution.
+- Tenant Growth.
+- Platform Activity.
+
+## 6.7 Audit Logs
+
+Display:
+
+- User or administrator.
+- Action.
+- Resource.
+- Date and time.
+- Activity description.
+
+Use realistic sample activities.
+
+# 7. PHARMACY ADMIN DASHBOARD
+
+Create a complete Pharmacy Admin Dashboard.
+
+It must look like the agreed ERP design and provide a realistic pharmacy management experience.
+
+It must support both Light and Dark Themes.
+
+## 7.1 Sidebar Navigation
+
+Include:
+
+- Dashboard.
+- Products.
+- Inventory.
+- Batch & Expiry.
+- Sales & POS.
+- Customers.
+- Suppliers.
+- Purchases.
+- Finance.
+- Expenses.
+- Laboratory Reports.
+- Reports.
+- Notifications.
+- Settings.
+
+## 7.2 Dashboard Overview
+
+Include the following KPI cards:
+
+- Today's Sales.
+- Monthly Sales.
+- Total Products.
+- Low Stock.
+- Near Expiry.
+- Supplier Payables.
+- Total Laboratory Requests.
+- Answered Requests.
+- Pending Requests.
+
+Include:
+
+- Sales Chart.
+- Payment Overview.
+- Low Stock Alerts.
+- Expiry Alerts.
+- Recent Sales.
+- Recent Purchases.
+- Recent Activities.
+
+Include Quick Actions:
+
+- New Sale.
+- Add Product.
+- Record Purchase.
+- View Reports.
+
+Use realistic sample data.
+
+## 7.3 Products
+
+Include:
+
+- Product list.
+- Product details.
+- Product categories.
+- Medicine information.
+- Product search.
+- Product filters.
+- Add Product form.
+- Edit Product form.
+- Product details view.
+
+## 7.4 Inventory
+
+Include:
+
+- Current stock.
+- Stock movements.
+- Stock adjustments.
+- Stock history.
+- Stock availability.
+- Low stock monitoring.
+
+## 7.5 Batch & Expiry
+
+Include:
+
+- Batch numbers.
+- Product names.
+- Expiry dates.
+- Available quantities.
+- Near-expiry status.
+- Expired stock status.
+
+Provide realistic warning indicators.
+
+## 7.6 Sales & POS
+
+Build an interactive Point of Sale experience.
+
+Include:
+
+- Product search.
+- Product selection.
+- Cart.
+- Quantity adjustments.
+- Discounts where applicable.
+- Subtotal.
+- Total.
+- Payment method.
+- Checkout.
+
+On demo checkout:
+
+- Create a simulated sale.
+- Update the cart.
+- Update the simulated stock quantity.
+- Add a sales record.
+- Update relevant dashboard statistics.
+- Show a success confirmation.
+
+Do not process real payments.
+
+## 7.7 Customers
+
+Include:
+
+- Customer list.
+- Customer details.
+- Contact information.
+- Relevant transaction history.
+- Add and edit customer forms.
+
+## 7.8 Suppliers
+
+Include:
+
+- Supplier list.
+- Supplier information.
+- Contact details.
+- Supplier history.
+- Supplier details view.
+
+## 7.9 Purchases
+
+Include:
+
+- Purchase records.
+- Supplier selection.
+- Product selection.
+- Quantities.
+- Purchase totals.
+- Payment status.
+- Purchase history.
+
+A simulated purchase should update the relevant inventory records.
+
+## 7.10 Finance
+
+Include:
+
+- Financial overview.
+- Payments.
+- Receivables where applicable.
+- Supplier payables.
+- Transaction history.
+- Financial charts.
+
+## 7.11 Expenses
+
+Include:
+
+- Expense records.
+- Expense categories.
+- Amounts.
+- Dates.
+- Descriptions.
+- Expense summaries.
+
+## 7.12 Laboratory Reports
+
+This module is mandatory.
+
+Build a realistic laboratory workflow.
+
+Include:
+
+**Patient Registration**
+- Patient name.
+- Contact information.
+- Relevant patient details.
+
+**Test Requests**
+- Test name.
+- Request date.
+- Patient reference.
+- Status.
+
+**Results**
+- Test result entry.
+- Result date.
+- Relevant notes.
+
+**Report Generation**
+- Professional laboratory report.
+- Patient details.
+- Test details.
+- Results.
+- Report date.
+
+**WhatsApp Delivery Simulation**
+- Allow the user to trigger a simulated report delivery.
+- Show a successful or failed delivery state.
+- Do not send real WhatsApp messages.
+
+Laboratory dashboard statistics must show:
+
+- Total Requests.
+- Answered.
+- Pending.
+
+Protect patient data in the interface and only show it in authorized Pharmacy contexts.
+
+## 7.13 Reports
+
+Include:
+
+- Sales Reports.
+- Inventory Reports.
+- Purchase Reports.
+- Expense Reports.
+- Financial Reports.
+- Laboratory Reports.
+
+Provide date filters and realistic report views.
+
+# 8. WHOLESALER / DISTRIBUTOR ADMIN DASHBOARD
+
+Create a separate Wholesaler / Distributor Admin Dashboard.
+
+It must use the same approved design system and branding, but its navigation and operational experience must reflect wholesaler business needs.
+
+It must support both Light and Dark Themes.
+
+Do not simply copy the Pharmacy Dashboard.
+
+## 8.1 Sidebar Navigation
+
+Include:
+
+- Dashboard.
+- Products.
+- Inventory.
+- Batch & Expiry.
+- Sales.
+- Customers.
+- Suppliers.
+- Purchases.
+- Finance.
+- Expenses.
+- Reports.
+- Notifications.
+- Settings.
+
+## 8.2 Dashboard Overview
+
+Include realistic wholesaler business KPI cards:
+
+- Today's Sales.
+- Monthly Sales.
+- Total Products.
+- Low Stock.
+- Near Expiry.
+- Total Customers.
+- Supplier Payables.
+- Outstanding Receivables.
+
+Include:
+
+- Sales Performance Chart.
+- Revenue Overview.
+- Inventory Overview.
+- Low Stock Alerts.
+- Expiry Alerts.
+- Recent Sales.
+- Recent Purchases.
+- Recent Activities.
+
+## 8.3 Products and Inventory
+
+Include:
+
+- Pharmaceutical product catalog.
+- Product details.
+- Categories.
+- Stock levels.
+- Batch tracking.
+- Expiry tracking.
+- Stock movements.
+
+## 8.4 Sales
+
+Build a realistic wholesale sales interface.
+
+Include:
+
+- Customer selection.
+- Product selection.
+- Quantities.
+- Unit prices.
+- Discounts where applicable.
+- Invoice creation.
+- Payment status.
+- Sales history.
+
+## 8.5 Customers
+
+Include business customer records and relevant transaction history.
+
+Do not implement a cross-tenant marketplace or online Pharmacy ordering system.
+
+## 8.6 Suppliers and Purchases
+
+Include:
+
+- Supplier management.
+- Purchase records.
+- Purchase details.
+- Goods received.
+- Purchase history.
+
+## 8.7 Finance and Expenses
+
+Include:
+
+- Financial overview.
+- Sales payments.
+- Supplier payables.
+- Customer receivables.
+- Expense records.
+- Financial summaries.
+
+## 8.8 Reports
+
+Include:
+
+- Sales Reports.
+- Inventory Reports.
+- Purchase Reports.
+- Customer Reports.
+- Financial Reports.
+- Expiry Reports.
+
+Only implement workflows that are supported by the agreed V0.0 business requirements. Do not invent complex wholesaler operations without identifying them as demo assumptions.
+
+# 9. DEMO AUTHENTICATION AND NAVIGATION
+
+The Demo must provide access to all four product experiences.
+
+Create a convenient Demo Access page or login experience with clearly separated entry points:
+
+- Public Website.
+- Super Admin Demo.
+- Pharmacy Admin Demo.
+- Wholesaler Admin Demo.
+
+Use simulated demo authentication.
+
+Provide preconfigured demo user profiles for each dashboard.
+
+The user must be able to switch between demo experiences without losing the ability to explore the application.
+
+Do not use real production credentials.
+
+Do not connect the Demo to a real identity provider.
+
+Do not make the demo login page visually different from the intended real login design.
+
+# 10. DEMO DATA
+
+Populate all interfaces with realistic sample data.
+
+Use believable:
+
+- Business names.
+- Product names.
+- Medicine names.
+- Categories.
+- Customers.
+- Suppliers.
+- Transactions.
+- Dates.
+- Financial figures.
+- Inventory quantities.
+- Expiry dates.
+- Applications.
+- Audit activities.
+
+Use consistent relationships between sample records.
+
+For example:
+
+- A sale must reference an existing product.
+- A purchase must reference a supplier.
+- An inventory record must reference an existing product.
+- A laboratory request must reference an existing patient.
+- An application approval must create a simulated tenant.
+
+Avoid empty dashboards.
+
+Avoid repeated generic placeholder text.
+
+Avoid meaningless random numbers.
+
+Do not use actual personal or patient information.
+
+# 11. INTERACTIVITY REQUIREMENTS
+
+The Demo must not be a static visual prototype.
+
+Implement working interactions for:
+
+- Navigation.
+- Sidebar collapse and expansion.
+- Search.
+- Filters.
+- Pagination.
+- Tables.
+- Forms.
+- Form validation.
+- Add records.
+- Edit records.
+- View details.
+- Status updates.
+- Confirmation dialogs.
+- Notifications.
+- Charts.
+- Date filters.
+- Dashboard actions.
+- Simulated sales.
+- Simulated purchases.
+- Laboratory report creation.
+- Application submission.
+- Application approval and rejection.
+- Tenant creation simulation.
+- Light/Dark Theme switching.
+
+Use realistic loading, empty, error, and success states where appropriate.
+
+Where an action changes data, the relevant screens and dashboard summaries should reflect the change.
+
+Persist demo changes during the active demo session where possible. Use a local demo data store or simulated API layer.
+
+Provide a way to restore the original sample data.
+
+# 12. TECHNICAL IMPLEMENTATION
+
+Use:
+
+- React.
+- TypeScript.
+- Vite.
+- Reusable UI components.
+- Feature-based frontend organization.
+- Consistent routing.
+- Centralized demo data.
+- A simulated service/API layer.
+- Responsive layout.
+- Centralized theme management.
+
+The Demo should be organized so that it can later be connected to the real ASP.NET Core Web API without redesigning the entire frontend.
+
+Separate:
+
+- UI components.
+- Business presentation logic.
+- Demo data.
+- Simulated API operations.
+- Routing.
+- Layouts.
+- Feature modules.
+- Theme tokens and theme configuration.
+
+Do not place all application logic in one large component.
+
+Do not mix all four product experiences into one dashboard.
+
+Do not hardcode inconsistent theme colors inside individual components.
+
+# 13. RESPONSIVE DESIGN
+
+The application must work properly on:
+
+- Desktop.
+- Laptop.
+- Tablet.
+- Mobile.
+
+Desktop is the primary design target for the ERP dashboards.
+
+The Public Website must be fully responsive.
+
+Dashboard navigation must adapt appropriately on smaller screens.
+
+Tables and forms must remain usable on mobile devices.
+
+# 14. CONSISTENCY REQUIREMENTS
+
+These requirements are mandatory:
+
+1. All four experiences must use the same official branding.
+2. All dashboards must use the exact approved brand colors.
+3. All dashboards must support Light and Dark Themes.
+4. Light Theme must be the default.
+5. Theme selection must remain consistent while navigating.
+6. The actual supplied transparent logo must be used.
+7. The logo must inherit the background of its surrounding surface through its transparency.
+8. No artificial background must be added behind the logo.
+9. All dashboard sidebars must follow the agreed design direction.
+10. The topbar must remain consistent.
+11. The same component design standards must be applied.
+12. Navigation must be clear and functional.
+13. No dashboard may look like a different product.
+14. The Public Website must remain consistent with the brand.
+15. Pharmacy and Wholesaler dashboards must remain functionally distinct.
+16. No unapproved redesign or alternative visual identity is allowed.
+
+# 15. DEMO VS REAL PRODUCTION
+
+The Demo must visually represent the real product.
+
+Do not remove important modules, simplify layouts, or change navigation merely because this is a Demo.
+
+The following are simulated:
+
+- Authentication.
+- Database operations.
+- Tenant provisioning.
+- Email delivery.
+- WhatsApp delivery.
+- Payments.
+- External integrations.
+- Background processing.
+
+The following must remain representative of the real product:
+
+- User interfaces.
+- Business workflows.
+- Navigation.
+- Forms.
+- Dashboard layouts.
+- Reports.
+- Data relationships.
+- Validation rules.
+- Access experiences.
+- Light and Dark Themes.
+
+Do not claim that simulated operations are real external transactions.
+
+Do not display unnecessary DEMO banners, badges, or visual elements that change the approved production design. Keep the distinction in the underlying demo environment and its access documentation.
+
+# 16. FINAL ACCEPTANCE CRITERIA
+
+The Demo is complete only when:
+
+- The Public Website is fully implemented.
+- The Super Admin Dashboard is fully implemented.
+- The Pharmacy Dashboard is fully implemented.
+- The Wholesaler Dashboard is fully implemented.
+- All four experiences use the approved branding.
+- The actual supplied transparent logo is used correctly.
+- The exact approved brand colors are used.
+- Light Theme is the default.
+- Dark Theme is fully implemented.
+- Theme Toggle works throughout the application.
+- Theme selection persists where local persistence is available.
+- The agreed dashboard design is followed.
+- All major navigation works.
+- All required pages exist.
+- Important forms are functional.
+- Tables and charts display realistic data.
+- Major business workflows can be demonstrated.
+- Demo actions update relevant sample data.
+- All layouts are responsive.
+- No major page is left as a placeholder.
+- No unapproved features are introduced.
+
+# FINAL EXECUTION INSTRUCTION
+
+Build a complete, high-quality, realistic interactive demonstration of the ePharmacy ERP Platform for MI'AH ICT Solutions.
+
+The Demo must be the visual and functional representation of the intended real V0.0 product.
+
+Do not create a simplified alternative product.
+
+Do not change the previously agreed design.
+
+Do not change the approved brand colors.
+
+Do not replace or modify the official logo.
+
+Preserve the logo's transparency so the background behind it always matches its surrounding surface.
+
+Implement both Light and Dark Themes, with Light Theme as the default.
+
+Do not omit any of the four required product experiences.
+
+Prioritize consistency, completeness, realistic workflows, professional UI/UX, and reliable interactions.
+
+The final result must look like a real commercial ePharmacy ERP Platform that is ready to be presented to stakeholders and potential customers, while all backend operations and external integrations remain safely simulated.
+
+**PRODUCT: ePharmacy ERP Platform**  
+**OWNER: MI'AH ICT Solutions**  
+**DELIVERABLE: Complete Interactive V0.0 Demo**

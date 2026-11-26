@@ -1,0 +1,6 @@
+{
+  "name": "eClinic ERP — MI'AH ICT Solutions",
+  "description": "Complete interactive demonstration of the eClinic ERP Platform by MI'AH ICT Solutions covering Public Website, Super Admin, Pharmacy Admin, and Pharmaceutical Admin dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
