@@ -88,7 +88,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticate }) => {
   return (
     <div className="min-h-screen bg-[#F4F6F9] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 flex flex-col justify-between">
       {/* Top Bar */}
-      <header className="bg-white dark:bg-[#111B2E] border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
+      <header className="bg-white dark:bg-[#111B2E] border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 h-20 sm:h-24 flex items-center justify-between gap-4">
         <button
           type="button"
           onClick={() => onAuthenticate('public')}

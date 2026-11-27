@@ -10,14 +10,14 @@ export const OFFICIAL_LOGO_SRC = '/assets/aistudio/eClinic_transparent-04_c73116
 export const Logo: React.FC<LogoProps> = ({ variant = 'default', className = '' }) => {
   const sizeClass =
     variant === 'compact'
-      ? 'h-9 sm:h-10'
+      ? 'h-14'
       : variant === 'sidebar'
-      ? 'h-12'
+      ? 'h-24'
       : variant === 'footer'
-      ? 'h-14 sm:h-16'
+      ? 'h-24 sm:h-28'
       : variant === 'auth'
-      ? 'h-12 sm:h-14'
-      : 'h-12 sm:h-14';
+      ? 'h-20 sm:h-24'
+      : 'h-20 sm:h-24';
 
   return (
     <img

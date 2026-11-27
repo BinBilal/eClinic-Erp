@@ -242,9 +242,9 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           collapsed ? 'w-[76px]' : 'w-[256px]'
         }`}
       >
-        <div className="h-20 px-4 flex items-center justify-between border-b border-slate-200 dark:border-white/15">
+        <div className="h-24 px-3 flex items-center justify-center border-b border-slate-200 dark:border-white/15">
           {collapsed ? (
-            <Logo variant="compact" className="mx-auto" />
+            <Logo variant="compact" />
           ) : (
             <Logo variant="sidebar" />
           )}
@@ -278,13 +278,13 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
             onClick={() => setMobileOpen(false)}
           />
           <aside className="relative w-72 max-w-[85vw] bg-[#F4F6F9] dark:bg-[#0F1E3A] text-[#1E396A] dark:text-white border-r border-slate-200 dark:border-slate-800 flex flex-col h-full z-10">
-            <div className="h-20 px-4 flex items-center justify-between border-b border-slate-200 dark:border-white/15">
+            <div className="relative h-24 px-12 flex items-center justify-center border-b border-slate-200 dark:border-white/15">
               <Logo variant="sidebar" />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
                 aria-label="Close navigation"
-                className="p-1.5 rounded-lg text-slate-600 dark:text-slate-200 hover:bg-white dark:hover:bg-white/10"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-600 dark:text-slate-200 hover:bg-white dark:hover:bg-white/10"
               >
                 <X className="h-5 w-5" />
               </button>

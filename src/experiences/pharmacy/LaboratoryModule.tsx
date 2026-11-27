@@ -725,7 +725,7 @@ export const LaboratoryModule: React.FC<LaboratoryModuleProps> = ({ onToast }) =
               <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 bg-white dark:bg-[#0D1628] print:bg-white print:text-slate-900 space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
                   <div>
-                    <Logo className="h-8" />
+                    <Logo className="h-16 sm:h-20" />
                     <p className="mt-2 text-xs font-bold text-[#1E396A] dark:text-white">
                       Al-Shifa Modern Pharmacy · Clinical Laboratory Unit
                     </p>

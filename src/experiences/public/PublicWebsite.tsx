@@ -473,11 +473,11 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({ onNavigateRole }) 
 
       {/* Main Sticky Navigation Header */}
       <header className="sticky top-0 z-40 bg-white dark:bg-[#111B2E] border-b border-slate-200 dark:border-slate-800 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-24 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={() => navigateTo('home')}
-            className="shrink-0 focus-visible:outline-2 focus-visible:outline-[#F05D21] rounded-md"
+            className="shrink-0 flex items-center focus-visible:outline-2 focus-visible:outline-[#F05D21] rounded-md"
           >
             <Logo />
           </button>
