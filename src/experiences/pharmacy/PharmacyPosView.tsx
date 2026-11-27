@@ -1,20 +1,30 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2, Minus, Plus, Receipt, Search, ShoppingCart, Trash2 } from 'lucide-react';
+import { CheckCircle2, Edit3, Eye, Minus, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react';
 import { ColumnDef, DataTable } from '../../components/ui/DataTable';
+import { DeleteConfirmModal } from '../../components/ui/DeleteConfirmModal';
 import { Modal } from '../../components/ui/Modal';
 import { StatusLabel } from '../../components/ui/StatusLabel';
 import { useDemoStore } from '../../store/demoStore';
-import { PaymentMethod, ProductRecord, SaleItem, SaleRecord } from '../../types/erp';
+import { PaymentMethod, PaymentStatus, ProductRecord, SaleItem, SaleRecord } from '../../types/erp';
 
 interface PharmacyPosViewProps {
-  onToast: (msg: string) => void;
+  onToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
 export const PharmacyPosView: React.FC<PharmacyPosViewProps> = ({ onToast }) => {
-  const { state, completeSale } = useDemoStore();
+  const { state, completeSale, updateSale, deleteSale } = useDemoStore();
   const [viewMode, setViewMode] = useState<'pos' | 'history'>('pos');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [editingSale, setEditingSale] = useState<SaleRecord | null>(null);
+  const [editSaleForm, setEditSaleForm] = useState({
+    customerId: '',
+    date: '',
+    paymentMethod: 'Cash' as PaymentMethod,
+    paymentStatus: 'Paid' as PaymentStatus,
+    discountTotal: '0',
+  });
+  const [deleteTargetSale, setDeleteTargetSale] = useState<SaleRecord | null>(null);
 
   const pharmacyProducts = useMemo(
     () => state.products.filter((p) => p.tenantScope === 'pharmacy'),
@@ -195,17 +205,47 @@ export const PharmacyPosView: React.FC<PharmacyPosViewProps> = ({ onToast }) => 
     },
     {
       key: 'receipt',
-      header: 'Receipt',
+      header: 'Actions',
       align: 'right',
       render: (s) => (
-        <button
-          type="button"
-          onClick={() => setCompletedReceipt(s)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-        >
-          <Receipt className="h-3.5 w-3.5" />
-          View
-        </button>
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            title="View Receipt"
+            onClick={() => setCompletedReceipt(s)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </button>
+          <button
+            type="button"
+            title="Edit Sale"
+            onClick={() => {
+              setEditingSale(s);
+              setEditSaleForm({
+                customerId: s.customerId,
+                date: s.date,
+                paymentMethod: s.paymentMethod,
+                paymentStatus: s.paymentStatus,
+                discountTotal: String(s.discountTotal),
+              });
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            type="button"
+            title="Archive / Delete Sale"
+            onClick={() => setDeleteTargetSale(s)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
       ),
     },
   ];
@@ -547,6 +587,171 @@ export const PharmacyPosView: React.FC<PharmacyPosViewProps> = ({ onToast }) => 
           </div>
         )}
       </Modal>
+
+      {/* Edit Sale Modal */}
+      <Modal
+        open={editingSale !== null}
+        onClose={() => setEditingSale(null)}
+        title={`Edit Sale — ${editingSale?.invoiceNo || ''}`}
+        subtitle="Update customer, payment method, settlement status, or order discount."
+        maxWidthClass="max-w-lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingSale(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!editingSale) return;
+                const disc = Math.min(
+                  editingSale.subtotal,
+                  Math.max(0, Number(editSaleForm.discountTotal) || 0)
+                );
+                updateSale(editingSale.id, {
+                  customerId: editSaleForm.customerId,
+                  date: editSaleForm.date,
+                  paymentMethod: editSaleForm.paymentMethod,
+                  paymentStatus: editSaleForm.paymentStatus,
+                  discountTotal: disc,
+                  total: Math.max(0, editingSale.subtotal - disc),
+                });
+                onToast(`Updated sale ${editingSale.invoiceNo}.`);
+                setEditingSale(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        {editingSale && (
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Customer
+                </label>
+                <select
+                  value={editSaleForm.customerId}
+                  onChange={(e) => setEditSaleForm({ ...editSaleForm, customerId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+                >
+                  {pharmacyCustomers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Sale Date
+                </label>
+                <input
+                  type="date"
+                  value={editSaleForm.date}
+                  onChange={(e) => setEditSaleForm({ ...editSaleForm, date: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white tabular-nums"
+                />
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Payment Method
+                </label>
+                <select
+                  value={editSaleForm.paymentMethod}
+                  onChange={(e) =>
+                    setEditSaleForm({
+                      ...editSaleForm,
+                      paymentMethod: e.target.value as PaymentMethod,
+                    })
+                  }
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="EVC Plus">EVC Plus</option>
+                  <option value="Zaad">Zaad</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Credit">Customer Credit</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Payment Status
+                </label>
+                <select
+                  value={editSaleForm.paymentStatus}
+                  onChange={(e) =>
+                    setEditSaleForm({
+                      ...editSaleForm,
+                      paymentStatus: e.target.value as PaymentStatus,
+                    })
+                  }
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+                >
+                  <option value="Paid">Paid</option>
+                  <option value="Partial">Partial</option>
+                  <option value="Pending">Pending</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Discount ($)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={editSaleForm.discountTotal}
+                  onChange={(e) =>
+                    setEditSaleForm({ ...editSaleForm, discountTotal: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white tabular-nums"
+                />
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628] flex justify-between text-xs font-semibold text-[#1E396A] dark:text-white">
+              <span>Updated Total</span>
+              <span className="tabular-nums">
+                $
+                {Math.max(
+                  0,
+                  editingSale.subtotal -
+                    Math.min(editingSale.subtotal, Math.max(0, Number(editSaleForm.discountTotal) || 0))
+                ).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <DeleteConfirmModal
+        open={deleteTargetSale !== null}
+        onClose={() => setDeleteTargetSale(null)}
+        title="Archive & Delete Sale Receipt"
+        recordType="Pharmacy Sale"
+        recordLabel={
+          deleteTargetSale
+            ? `${deleteTargetSale.invoiceNo} · ${deleteTargetSale.customerName} ($${deleteTargetSale.total.toFixed(2)})`
+            : ''
+        }
+        isSoftDelete
+        warningMessage="This will remove the sale from active POS history, restore dispensed stock quantities to inventory, adjust customer balance, and preserve an immutable archive snapshot for financial audit compliance."
+        onConfirm={() => {
+          if (!deleteTargetSale) return;
+          const res = deleteSale(deleteTargetSale.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+          setDeleteTargetSale(null);
+        }}
+      />
     </div>
   );
 };

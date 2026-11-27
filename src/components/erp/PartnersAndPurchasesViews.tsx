@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Edit3, Eye, Plus, Trash2 } from 'lucide-react';
 import { ColumnDef, DataTable } from '../ui/DataTable';
+import { DeleteConfirmModal } from '../ui/DeleteConfirmModal';
 import { Modal } from '../ui/Modal';
 import { StatusLabel } from '../ui/StatusLabel';
 import { useDemoStore } from '../../store/demoStore';
@@ -14,14 +15,15 @@ import {
 
 interface ScopeProps {
   tenantScope: TenantScope;
-  onToast: (msg: string) => void;
+  onToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
 export const CustomersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) => {
-  const { state, addCustomer, updateCustomer } = useDemoStore();
+  const { state, addCustomer, updateCustomer, deleteCustomer } = useDemoStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CustomerRecord | null>(null);
   const [viewing, setViewing] = useState<CustomerRecord | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<CustomerRecord | null>(null);
 
   const scopedCustomers = useMemo(
     () => state.customers.filter((c) => c.tenantScope === tenantScope),
@@ -156,6 +158,14 @@ export const CustomersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
           >
             <Edit3 className="h-3.5 w-3.5" />
           </button>
+          <button
+            type="button"
+            onClick={() => setDeletingCustomer(c)}
+            className="p-1.5 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+            title="Delete customer"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       ),
     },
@@ -273,6 +283,18 @@ export const CustomersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
               className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg"
             />
           </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Receivable Balance ($)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={form.balanceReceivable}
+              onChange={(e) => setForm({ ...form, balanceReceivable: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
+            />
+          </div>
         </div>
       </Modal>
 
@@ -325,21 +347,56 @@ export const CustomersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
           </div>
         )}
       </Modal>
+      <DeleteConfirmModal
+        open={deletingCustomer !== null}
+        onClose={() => setDeletingCustomer(null)}
+        onConfirm={() => {
+          if (!deletingCustomer) return;
+          const res = deleteCustomer(deletingCustomer.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+        }}
+        isSoftDelete
+        recordType="customer"
+        recordLabel={deletingCustomer ? `${deletingCustomer.name} (${deletingCustomer.phone})` : ''}
+        warningMessage="Deleting this customer archives their profile from the active customer directory while preserving existing historical invoice records."
+      />
     </div>
   );
 };
 
 export const SuppliersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) => {
-  const { state, addSupplier } = useDemoStore();
+  const { state, addSupplier, updateSupplier, deleteSupplier } = useDemoStore();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierRecord | null>(null);
   const [viewing, setViewing] = useState<SupplierRecord | null>(null);
+  const [deletingSupplier, setDeletingSupplier] = useState<SupplierRecord | null>(null);
   const [form, setForm] = useState({
     name: '',
     contactPerson: '',
     phone: '',
     email: '',
     address: '',
+    balancePayable: '0',
   });
+
+  const openAddSupplier = () => {
+    setEditingSupplier(null);
+    setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', balancePayable: '0' });
+    setModalOpen(true);
+  };
+
+  const openEditSupplier = (s: SupplierRecord) => {
+    setEditingSupplier(s);
+    setForm({
+      name: s.name,
+      contactPerson: s.contactPerson,
+      phone: s.phone,
+      email: s.email,
+      address: s.address,
+      balancePayable: String(s.balancePayable),
+    });
+    setModalOpen(true);
+  };
 
   const scopedSuppliers = useMemo(
     () => state.suppliers.filter((s) => s.tenantScope === tenantScope),
@@ -398,14 +455,32 @@ export const SuppliersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
       header: 'Actions',
       align: 'right',
       render: (s) => (
-        <button
-          type="button"
-          onClick={() => setViewing(s)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-        >
-          <Eye className="h-3.5 w-3.5" />
-          Details
-        </button>
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewing(s)}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="View supplier details"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => openEditSupplier(s)}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="Edit supplier"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeletingSupplier(s)}
+            className="p-1.5 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+            title="Delete supplier"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       ),
     },
   ];
@@ -418,7 +493,7 @@ export const SuppliersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
         </p>
         <button
           type="button"
-          onClick={() => setModalOpen(true)}
+          onClick={openAddSupplier}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-semibold"
         >
           <Plus className="h-4 w-4" />
@@ -441,7 +516,7 @@ export const SuppliersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Add Supplier"
+        title={editingSupplier ? 'Edit Supplier' : 'Add Supplier'}
         maxWidthClass="max-w-lg"
         footer={
           <>
@@ -456,14 +531,41 @@ export const SuppliersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
               type="button"
               disabled={!form.name.trim()}
               onClick={() => {
-                addSupplier({ ...form, balancePayable: 0, tenantScope });
-                onToast(`Added supplier ${form.name}.`);
+                if (editingSupplier) {
+                  updateSupplier(editingSupplier.id, {
+                    name: form.name.trim(),
+                    contactPerson: form.contactPerson.trim(),
+                    phone: form.phone.trim(),
+                    email: form.email.trim(),
+                    address: form.address.trim(),
+                    balancePayable: Math.max(0, Number(form.balancePayable) || 0),
+                  });
+                  onToast(`Updated supplier ${form.name}.`);
+                } else {
+                  addSupplier({
+                    name: form.name.trim(),
+                    contactPerson: form.contactPerson.trim(),
+                    phone: form.phone.trim(),
+                    email: form.email.trim(),
+                    address: form.address.trim(),
+                    balancePayable: Math.max(0, Number(form.balancePayable) || 0),
+                    tenantScope,
+                  });
+                  onToast(`Added supplier ${form.name}.`);
+                }
                 setModalOpen(false);
-                setForm({ name: '', contactPerson: '', phone: '', email: '', address: '' });
+                setForm({
+                  name: '',
+                  contactPerson: '',
+                  phone: '',
+                  email: '',
+                  address: '',
+                  balancePayable: '0',
+                });
               }}
               className="px-4 py-2 rounded-lg bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-semibold disabled:opacity-40"
             >
-              Save Supplier
+              {editingSupplier ? 'Save Changes' : 'Save Supplier'}
             </button>
           </>
         }
@@ -514,6 +616,16 @@ export const SuppliersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Balance Payable ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={form.balancePayable}
+              onChange={(e) => setForm({ ...form, balancePayable: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
             />
           </div>
         </div>
@@ -568,13 +680,35 @@ export const SuppliersView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
           </div>
         )}
       </Modal>
+      <DeleteConfirmModal
+        open={deletingSupplier !== null}
+        onClose={() => setDeletingSupplier(null)}
+        onConfirm={() => {
+          if (!deletingSupplier) return;
+          const res = deleteSupplier(deletingSupplier.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+        }}
+        isSoftDelete
+        recordType="supplier"
+        recordLabel={deletingSupplier ? `${deletingSupplier.name} (${deletingSupplier.contactPerson})` : ''}
+        warningMessage="Deleting this supplier archives them from the active directory while preserving historical purchase orders."
+      />
     </div>
   );
 };
 
 export const PurchasesView: React.FC<ScopeProps> = ({ tenantScope, onToast }) => {
-  const { state, recordPurchase } = useDemoStore();
+  const { state, recordPurchase, updatePurchase, deletePurchase } = useDemoStore();
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewingPurchase, setViewingPurchase] = useState<PurchaseRecord | null>(null);
+  const [editingPurchase, setEditingPurchase] = useState<PurchaseRecord | null>(null);
+  const [deletingPurchase, setDeletingPurchase] = useState<PurchaseRecord | null>(null);
+  const [poEditForm, setPoEditForm] = useState({
+    supplierId: '',
+    date: '',
+    paymentStatus: 'Paid' as PurchaseRecord['paymentStatus'],
+    goodsReceived: true,
+  });
 
   const scopedSuppliers = useMemo(
     () => state.suppliers.filter((s) => s.tenantScope === tenantScope),
@@ -686,6 +820,47 @@ export const PurchasesView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
       key: 'pay',
       header: 'Payment Status',
       render: (p) => <StatusLabel label={p.paymentStatus} />,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (p) => (
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewingPurchase(p)}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="View purchase order"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingPurchase(p);
+              setPoEditForm({
+                supplierId: p.supplierId,
+                date: p.date,
+                paymentStatus: p.paymentStatus,
+                goodsReceived: p.goodsReceived,
+              });
+            }}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="Edit purchase order"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeletingPurchase(p)}
+            className="p-1.5 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+            title="Archive purchase order"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -890,6 +1065,166 @@ export const PurchasesView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
           )}
         </div>
       </Modal>
+
+      {/* View Purchase Order Modal */}
+      <Modal
+        open={viewingPurchase !== null}
+        onClose={() => setViewingPurchase(null)}
+        title={`Purchase Order ${viewingPurchase?.poNumber || ''}`}
+        subtitle={viewingPurchase ? `${viewingPurchase.supplierName} · ${viewingPurchase.date}` : ''}
+      >
+        {viewingPurchase && (
+          <div className="space-y-4 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Supplier</p>
+                <p className="font-bold text-[#1E396A] dark:text-white mt-0.5">{viewingPurchase.supplierName}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusLabel label={viewingPurchase.goodsReceived ? 'Received' : 'Pending'} />
+                <StatusLabel label={viewingPurchase.paymentStatus} />
+              </div>
+            </div>
+            <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-[#F4F6F9] dark:bg-[#0D1628] border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                  <tr>
+                    <th className="px-3 py-2">Product</th>
+                    <th className="px-3 py-2">Batch / Expiry</th>
+                    <th className="px-3 py-2 text-right">Qty</th>
+                    <th className="px-3 py-2 text-right">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 dark:text-slate-200">
+                  {viewingPurchase.items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="px-3 py-2 font-medium">{item.productName}</td>
+                      <td className="px-3 py-2 font-mono text-slate-500 dark:text-slate-400">
+                        {item.batchNumber} · {item.expiryDate}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{item.qty}</td>
+                      <td className="px-3 py-2 text-right font-semibold tabular-nums">${item.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-[#1E396A] dark:text-white pt-2 border-t border-slate-200 dark:border-slate-800">
+              <span>Total Purchase Cost</span>
+              <span className="tabular-nums">${viewingPurchase.total.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Purchase Order Modal */}
+      <Modal
+        open={editingPurchase !== null}
+        onClose={() => setEditingPurchase(null)}
+        title={`Edit Purchase Order ${editingPurchase?.poNumber || ''}`}
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingPurchase(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!editingPurchase) return;
+                updatePurchase(editingPurchase.id, {
+                  supplierId: poEditForm.supplierId,
+                  date: poEditForm.date,
+                  paymentStatus: poEditForm.paymentStatus,
+                  goodsReceived: poEditForm.goodsReceived,
+                });
+                onToast(`Updated purchase order ${editingPurchase.poNumber}.`);
+                setEditingPurchase(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-semibold"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Supplier</label>
+            <select
+              value={poEditForm.supplierId}
+              onChange={(e) => setPoEditForm({ ...poEditForm, supplierId: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628]"
+            >
+              {scopedSuppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Date</label>
+              <input
+                type="date"
+                value={poEditForm.date}
+                onChange={(e) => setPoEditForm({ ...poEditForm, date: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Payment Status
+              </label>
+              <select
+                value={poEditForm.paymentStatus}
+                onChange={(e) =>
+                  setPoEditForm({
+                    ...poEditForm,
+                    paymentStatus: e.target.value as PurchaseRecord['paymentStatus'],
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628]"
+              >
+                <option value="Paid">Paid</option>
+                <option value="Partial">Partial</option>
+                <option value="Unpaid">Unpaid</option>
+              </select>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={poEditForm.goodsReceived}
+              onChange={(e) => setPoEditForm({ ...poEditForm, goodsReceived: e.target.checked })}
+            />
+            Goods Received into Stock
+          </label>
+        </div>
+      </Modal>
+
+      <DeleteConfirmModal
+        open={deletingPurchase !== null}
+        onClose={() => setDeletingPurchase(null)}
+        onConfirm={() => {
+          if (!deletingPurchase) return;
+          const res = deletePurchase(deletingPurchase.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+        }}
+        isSoftDelete
+        recordType="purchase order"
+        recordLabel={
+          deletingPurchase
+            ? `${deletingPurchase.poNumber} — ${deletingPurchase.supplierName} ($${deletingPurchase.total.toFixed(2)})`
+            : ''
+        }
+        warningMessage="Archiving this purchase order reverses its supplier payable impact and deducts received stock quantities if goods were already stocked."
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Edit3, Eye, Plus, SlidersHorizontal } from 'lucide-react';
+import { Edit3, Eye, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { DataTable, ColumnDef } from '../ui/DataTable';
+import { DeleteConfirmModal } from '../ui/DeleteConfirmModal';
 import { Modal } from '../ui/Modal';
 import { StatusLabel } from '../ui/StatusLabel';
 import { getBatchStatus, useDemoStore } from '../../store/demoStore';
@@ -8,15 +9,16 @@ import { BatchRecord, ProductRecord, StockMovementRecord, TenantScope } from '..
 
 interface ScopeProps {
   tenantScope: TenantScope;
-  onToast: (msg: string) => void;
+  onToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
 export const ProductsView: React.FC<ScopeProps> = ({ tenantScope, onToast }) => {
-  const { state, addProduct, updateProduct } = useDemoStore();
+  const { state, addProduct, updateProduct, deleteProduct } = useDemoStore();
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
   const [viewProduct, setViewProduct] = useState<ProductRecord | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<ProductRecord | null>(null);
 
   const scopedProducts = useMemo(
     () => state.products.filter((p) => p.tenantScope === tenantScope),
@@ -212,6 +214,14 @@ export const ProductsView: React.FC<ScopeProps> = ({ tenantScope, onToast }) => 
             title="Edit product"
           >
             <Edit3 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeletingProduct(p)}
+            className="p-1.5 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+            title="Delete product"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       ),
@@ -459,16 +469,58 @@ export const ProductsView: React.FC<ScopeProps> = ({ tenantScope, onToast }) => 
           </div>
         )}
       </Modal>
+      <DeleteConfirmModal
+        open={deletingProduct !== null}
+        onClose={() => setDeletingProduct(null)}
+        onConfirm={() => {
+          if (!deletingProduct) return;
+          const res = deleteProduct(deletingProduct.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+        }}
+        recordType="product"
+        recordLabel={deletingProduct ? `${deletingProduct.sku} — ${deletingProduct.name}` : ''}
+        warningMessage="Deleting this product will remove it from active catalog and clean up any linked batch records while keeping an audit log."
+      />
     </div>
   );
 };
 
 export const InventoryView: React.FC<ScopeProps> = ({ tenantScope, onToast }) => {
-  const { state, adjustStock } = useDemoStore();
+  const {
+    state,
+    adjustStock,
+    updateProduct,
+    deleteProduct,
+    updateStockMovement,
+    deleteStockMovement,
+  } = useDemoStore();
   const [tab, setTab] = useState<'stock' | 'low' | 'movements'>('stock');
   const [adjustModal, setAdjustModal] = useState<ProductRecord | null>(null);
   const [qtyDelta, setQtyDelta] = useState('0');
   const [adjustNote, setAdjustNote] = useState('');
+
+  // Inventory stock View/Edit/Delete states
+  const [viewStockProd, setViewStockProd] = useState<ProductRecord | null>(null);
+  const [editStockProd, setEditStockProd] = useState<ProductRecord | null>(null);
+  const [stockEditForm, setStockEditForm] = useState({
+    stockQty: '0',
+    minStock: '0',
+    costPrice: '0',
+    sellPrice: '0',
+  });
+  const [deleteStockProd, setDeleteStockProd] = useState<ProductRecord | null>(null);
+
+  // Stock Movement View/Edit/Delete states
+  const [viewMovement, setViewMovement] = useState<StockMovementRecord | null>(null);
+  const [editMovement, setEditMovement] = useState<StockMovementRecord | null>(null);
+  const [movEditForm, setMovEditForm] = useState({
+    type: 'Adjustment' as StockMovementRecord['type'],
+    qtyChange: '0',
+    reference: '',
+    date: '',
+    note: '',
+  });
+  const [deleteMovementTarget, setDeleteMovementTarget] = useState<StockMovementRecord | null>(null);
 
   const scopedProducts = useMemo(
     () => state.products.filter((p) => p.tenantScope === tenantScope),
@@ -541,21 +593,56 @@ export const InventoryView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
     },
     {
       key: 'action',
-      header: 'Adjust',
+      header: 'Actions',
       align: 'right',
       render: (p) => (
-        <button
-          type="button"
-          onClick={() => {
-            setAdjustModal(p);
-            setQtyDelta('0');
-            setAdjustNote('');
-          }}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          Adjust
-        </button>
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewStockProd(p)}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="View inventory details"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditStockProd(p);
+              setStockEditForm({
+                stockQty: String(p.stockQty),
+                minStock: String(p.minStock),
+                costPrice: String(p.costPrice),
+                sellPrice: String(p.sellPrice),
+              });
+            }}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="Edit stock thresholds"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAdjustModal(p);
+              setQtyDelta('0');
+              setAdjustNote('');
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="Quick stock adjustment"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Adjust
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteStockProd(p)}
+            className="p-1.5 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+            title="Delete inventory item"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       ),
     },
   ];
@@ -603,6 +690,48 @@ export const InventoryView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
       key: 'note',
       header: 'Note',
       render: (m) => <span className="text-xs text-slate-500 dark:text-slate-400">{m.note}</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (m) => (
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewMovement(m)}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="View movement"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditMovement(m);
+              setMovEditForm({
+                type: m.type,
+                qtyChange: String(m.qtyChange),
+                reference: m.reference,
+                date: m.date,
+                note: m.note,
+              });
+            }}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="Edit movement"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteMovementTarget(m)}
+            className="p-1.5 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+            title="Delete movement"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -731,13 +860,325 @@ export const InventoryView: React.FC<ScopeProps> = ({ tenantScope, onToast }) =>
           </div>
         </div>
       </Modal>
+
+      {/* View Inventory Item Modal */}
+      <Modal
+        open={viewStockProd !== null}
+        onClose={() => setViewStockProd(null)}
+        title={viewStockProd?.name || 'Inventory Details'}
+        subtitle={viewStockProd ? `${viewStockProd.sku} · ${viewStockProd.category}` : ''}
+      >
+        {viewStockProd && (
+          <div className="grid sm:grid-cols-2 gap-4 text-xs">
+            <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <p className="text-slate-500 dark:text-slate-400">Available Stock</p>
+              <p className="font-bold text-base text-[#1E396A] dark:text-sky-300 mt-0.5 tabular-nums">
+                {viewStockProd.stockQty} {viewStockProd.unit}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <p className="text-slate-500 dark:text-slate-400">Minimum Reorder Level</p>
+              <p className="font-bold text-base text-slate-900 dark:text-white mt-0.5 tabular-nums">
+                {viewStockProd.minStock} {viewStockProd.unit}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <p className="text-slate-500 dark:text-slate-400">Valuation (Cost Basis)</p>
+              <p className="font-bold text-base text-[#1E396A] dark:text-sky-300 mt-0.5 tabular-nums">
+                ${(viewStockProd.stockQty * viewStockProd.costPrice).toFixed(2)}
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <p className="text-slate-500 dark:text-slate-400">Unit Cost / Selling Price</p>
+              <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 tabular-nums">
+                ${viewStockProd.costPrice.toFixed(2)} / ${viewStockProd.sellPrice.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Inventory Item Modal */}
+      <Modal
+        open={editStockProd !== null}
+        onClose={() => setEditStockProd(null)}
+        title="Edit Inventory Stock & Thresholds"
+        subtitle={editStockProd ? `${editStockProd.sku} · ${editStockProd.name}` : ''}
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditStockProd(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!editStockProd) return;
+                updateProduct(editStockProd.id, {
+                  stockQty: Math.max(0, Number(stockEditForm.stockQty) || 0),
+                  minStock: Math.max(0, Number(stockEditForm.minStock) || 0),
+                  costPrice: Math.max(0, Number(stockEditForm.costPrice) || 0),
+                  sellPrice: Math.max(0, Number(stockEditForm.sellPrice) || 0),
+                });
+                onToast(`Updated inventory parameters for ${editStockProd.name}.`);
+                setEditStockProd(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-semibold"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Current Stock Qty
+            </label>
+            <input
+              type="number"
+              value={stockEditForm.stockQty}
+              onChange={(e) => setStockEditForm({ ...stockEditForm, stockQty: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Reorder Level
+            </label>
+            <input
+              type="number"
+              value={stockEditForm.minStock}
+              onChange={(e) => setStockEditForm({ ...stockEditForm, minStock: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Unit Cost ($)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={stockEditForm.costPrice}
+              onChange={(e) => setStockEditForm({ ...stockEditForm, costPrice: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Selling Price ($)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={stockEditForm.sellPrice}
+              onChange={(e) => setStockEditForm({ ...stockEditForm, sellPrice: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <DeleteConfirmModal
+        open={deleteStockProd !== null}
+        onClose={() => setDeleteStockProd(null)}
+        onConfirm={() => {
+          if (!deleteStockProd) return;
+          const res = deleteProduct(deleteStockProd.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+        }}
+        recordType="inventory product"
+        recordLabel={deleteStockProd ? `${deleteStockProd.sku} — ${deleteStockProd.name}` : ''}
+      />
+
+      {/* View Stock Movement Modal */}
+      <Modal
+        open={viewMovement !== null}
+        onClose={() => setViewMovement(null)}
+        title="Stock Movement Details"
+        subtitle={viewMovement ? `${viewMovement.reference} · ${viewMovement.date}` : ''}
+        maxWidthClass="max-w-md"
+      >
+        {viewMovement && (
+          <div className="space-y-3 text-xs">
+            <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <p className="text-slate-500 dark:text-slate-400">Product</p>
+              <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{viewMovement.productName}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+                <p className="text-slate-500 dark:text-slate-400">Movement Type</p>
+                <p className="font-semibold text-[#1E396A] dark:text-sky-300 mt-0.5">{viewMovement.type}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+                <p className="text-slate-500 dark:text-slate-400">Quantity Change</p>
+                <p className="font-bold tabular-nums mt-0.5 dark:text-white">
+                  {viewMovement.qtyChange >= 0 ? `+${viewMovement.qtyChange}` : viewMovement.qtyChange}
+                </p>
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <p className="text-slate-500 dark:text-slate-400">Notes</p>
+              <p className="text-slate-700 dark:text-slate-200 mt-0.5">{viewMovement.note}</p>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Stock Movement Modal */}
+      <Modal
+        open={editMovement !== null}
+        onClose={() => setEditMovement(null)}
+        title="Edit Stock Movement"
+        subtitle={editMovement ? `${editMovement.reference} · ${editMovement.productName}` : ''}
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditMovement(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!editMovement) return;
+                updateStockMovement(editMovement.id, {
+                  type: movEditForm.type,
+                  qtyChange: Number(movEditForm.qtyChange) || 0,
+                  reference: movEditForm.reference.trim() || editMovement.reference,
+                  date: movEditForm.date || editMovement.date,
+                  note: movEditForm.note.trim(),
+                });
+                onToast(`Updated stock movement ${movEditForm.reference}.`);
+                setEditMovement(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-semibold"
+            >
+              Save Movement
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Movement Type
+              </label>
+              <select
+                value={movEditForm.type}
+                onChange={(e) =>
+                  setMovEditForm({
+                    ...movEditForm,
+                    type: e.target.value as StockMovementRecord['type'],
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628]"
+              >
+                <option value="Adjustment">Adjustment</option>
+                <option value="Purchase">Purchase</option>
+                <option value="Sale">Sale</option>
+                <option value="Return">Return</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Qty Change
+              </label>
+              <input
+                type="number"
+                value={movEditForm.qtyChange}
+                onChange={(e) => setMovEditForm({ ...movEditForm, qtyChange: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
+              />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Reference
+              </label>
+              <input
+                type="text"
+                value={movEditForm.reference}
+                onChange={(e) => setMovEditForm({ ...movEditForm, reference: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Date
+              </label>
+              <input
+                type="date"
+                value={movEditForm.date}
+                onChange={(e) => setMovEditForm({ ...movEditForm, date: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Note
+            </label>
+            <input
+              type="text"
+              value={movEditForm.note}
+              onChange={(e) => setMovEditForm({ ...movEditForm, note: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <DeleteConfirmModal
+        open={deleteMovementTarget !== null}
+        onClose={() => setDeleteMovementTarget(null)}
+        onConfirm={() => {
+          if (!deleteMovementTarget) return;
+          const res = deleteStockMovement(deleteMovementTarget.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+        }}
+        isSoftDelete
+        recordType="stock movement"
+        recordLabel={
+          deleteMovementTarget
+            ? `${deleteMovementTarget.reference} — ${deleteMovementTarget.productName} (${
+                deleteMovementTarget.qtyChange >= 0
+                  ? `+${deleteMovementTarget.qtyChange}`
+                  : deleteMovementTarget.qtyChange
+              })`
+            : ''
+        }
+        warningMessage="Removing this movement archives its record and reverses its quantity change on the product's current stock."
+      />
     </div>
   );
 };
 
-export const BatchExpiryView: React.FC<{ tenantScope: TenantScope }> = ({ tenantScope }) => {
-  const { state } = useDemoStore();
+export const BatchExpiryView: React.FC<{
+  tenantScope: TenantScope;
+  onToast?: (msg: string, type?: 'success' | 'error') => void;
+}> = ({ tenantScope, onToast }) => {
+  const { state, updateBatch, deleteBatch } = useDemoStore();
   const [statusFilter, setStatusFilter] = useState<'All' | 'Valid' | 'Near Expiry' | 'Expired'>('All');
+  const [viewingBatch, setViewingBatch] = useState<BatchRecord | null>(null);
+  const [editingBatch, setEditingBatch] = useState<BatchRecord | null>(null);
+  const [deletingBatch, setDeletingBatch] = useState<BatchRecord | null>(null);
+  const [batchForm, setBatchForm] = useState({
+    batchNumber: '',
+    supplierName: '',
+    expiryDate: '',
+    qty: '0',
+  });
 
   const scopedBatches = useMemo(
     () =>
@@ -792,6 +1233,47 @@ export const BatchExpiryView: React.FC<{ tenantScope: TenantScope }> = ({ tenant
         <StatusLabel label={getBatchStatus(b.expiryDate, state.systemConfig.expiryAlertDays)} />
       ),
     },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (b) => (
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewingBatch(b)}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="View batch"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingBatch(b);
+              setBatchForm({
+                batchNumber: b.batchNumber,
+                supplierName: b.supplierName,
+                expiryDate: b.expiryDate,
+                qty: String(b.qty),
+              });
+            }}
+            className="p-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+            title="Edit batch"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeletingBatch(b)}
+            className="p-1.5 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+            title="Delete batch"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -824,6 +1306,135 @@ export const BatchExpiryView: React.FC<{ tenantScope: TenantScope }> = ({ tenant
             ))}
           </div>
         }
+      />
+
+      <Modal
+        open={viewingBatch !== null}
+        onClose={() => setViewingBatch(null)}
+        title={`Batch ${viewingBatch?.batchNumber || ''}`}
+        subtitle={viewingBatch?.productName}
+        maxWidthClass="max-w-md"
+      >
+        {viewingBatch && (
+          <div className="space-y-3 text-xs">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <span className="text-slate-500 dark:text-slate-400">Expiry Status</span>
+              <StatusLabel label={getBatchStatus(viewingBatch.expiryDate, state.systemConfig.expiryAlertDays)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+                <p className="text-slate-500 dark:text-slate-400">Quantity</p>
+                <p className="font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{viewingBatch.qty}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+                <p className="text-slate-500 dark:text-slate-400">Expiry Date</p>
+                <p className="font-bold text-slate-900 dark:text-white tabular-nums mt-0.5">{viewingBatch.expiryDate}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+                <p className="text-slate-500 dark:text-slate-400">Supplier</p>
+                <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{viewingBatch.supplierName}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+                <p className="text-slate-500 dark:text-slate-400">Received Date</p>
+                <p className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums mt-0.5">
+                  {viewingBatch.receivedDate}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={editingBatch !== null}
+        onClose={() => setEditingBatch(null)}
+        title="Edit Batch Record"
+        subtitle={editingBatch ? `${editingBatch.batchNumber} · ${editingBatch.productName}` : ''}
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingBatch(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!editingBatch) return;
+                updateBatch(editingBatch.id, {
+                  batchNumber: batchForm.batchNumber.trim() || editingBatch.batchNumber,
+                  supplierName: batchForm.supplierName.trim() || editingBatch.supplierName,
+                  expiryDate: batchForm.expiryDate || editingBatch.expiryDate,
+                  qty: Math.max(0, Number(batchForm.qty) || 0),
+                });
+                onToast?.(`Updated batch ${batchForm.batchNumber}.`);
+                setEditingBatch(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-semibold"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Batch Number</label>
+            <input
+              type="text"
+              value={batchForm.batchNumber}
+              onChange={(e) => setBatchForm({ ...batchForm, batchNumber: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg font-mono"
+            />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Expiry Date</label>
+              <input
+                type="date"
+                value={batchForm.expiryDate}
+                onChange={(e) => setBatchForm({ ...batchForm, expiryDate: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Quantity</label>
+              <input
+                type="number"
+                value={batchForm.qty}
+                onChange={(e) => setBatchForm({ ...batchForm, qty: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Supplier</label>
+            <input
+              type="text"
+              value={batchForm.supplierName}
+              onChange={(e) => setBatchForm({ ...batchForm, supplierName: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <DeleteConfirmModal
+        open={deletingBatch !== null}
+        onClose={() => setDeletingBatch(null)}
+        onConfirm={() => {
+          if (!deletingBatch) return;
+          const res = deleteBatch(deletingBatch.id);
+          onToast?.(res.message, res.ok ? 'success' : 'error');
+        }}
+        recordType="batch"
+        recordLabel={
+          deletingBatch ? `${deletingBatch.batchNumber} — ${deletingBatch.productName} (${deletingBatch.qty} units)` : ''
+        }
+        warningMessage="Deleting this batch will deduct its remaining units from available product stock and log an inventory adjustment."
       />
     </div>
   );

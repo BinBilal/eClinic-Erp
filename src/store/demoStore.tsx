@@ -3,7 +3,9 @@ import { INITIAL_DEMO_STATE, TODAY_ISO } from '../data/seedData';
 import {
   AccountRecord,
   ApplicationRecord,
+  ArchivedRecordEntry,
   AuditLogRecord,
+  BatchRecord,
   BusinessType,
   ContactMessageRecord,
   CustomerRecord,
@@ -13,11 +15,13 @@ import {
   PatientRecord,
   PaymentMethod,
   PaymentStatus,
+  PlatformFileRecord,
   ProductRecord,
   PurchaseItem,
   PurchaseRecord,
   SaleItem,
   SaleRecord,
+  StockMovementRecord,
   SupplierRecord,
   SystemConfig,
   TenantRecord,
@@ -65,7 +69,11 @@ interface DemoContextValue {
   verifyApplication: (appId: string) => void;
   approveApplication: (appId: string) => { tenant: TenantRecord; account: AccountRecord } | null;
   rejectApplication: (appId: string, reason: string) => void;
+  updateApplication: (appId: string, updates: Partial<ApplicationRecord>) => void;
+  deleteApplication: (appId: string) => { ok: boolean; message: string };
   toggleTenantStatus: (tenantId: string) => void;
+  updateTenant: (tenantId: string, updates: Partial<TenantRecord>) => void;
+  deleteTenant: (tenantId: string) => { ok: boolean; message: string };
   createTenantWithAccount: (payload: {
     businessName: string;
     businessType: BusinessType;
@@ -84,19 +92,28 @@ interface DemoContextValue {
     role: 'Pharmacy Admin' | 'Pharmaceutical Admin' | 'Super Admin';
     requirePasswordChange: boolean;
   }) => void;
+  updateAccount: (accountId: string, updates: Partial<AccountRecord>) => void;
+  deleteAccount: (accountId: string) => { ok: boolean; message: string };
   resetAccountPassword: (accountId: string) => void;
   completeFirstLoginPasswordChange: (email: string) => void;
+  updatePlatformFile: (fileId: string, updates: Partial<PlatformFileRecord>) => void;
+  deletePlatformFile: (fileId: string) => { ok: boolean; message: string };
   updateSystemConfig: (config: Partial<SystemConfig>) => void;
 
   // Pharmacy & Pharmaceutical Operations
   addProduct: (product: Omit<ProductRecord, 'id'>) => void;
   updateProduct: (id: string, updates: Partial<ProductRecord>) => void;
+  deleteProduct: (id: string) => { ok: boolean; message: string };
   adjustStock: (payload: {
     productId: string;
     qtyChange: number;
     note: string;
     tenantScope: TenantScope;
   }) => void;
+  updateBatch: (id: string, updates: Partial<BatchRecord>) => void;
+  deleteBatch: (id: string) => { ok: boolean; message: string };
+  updateStockMovement: (id: string, updates: Partial<StockMovementRecord>) => void;
+  deleteStockMovement: (id: string) => { ok: boolean; message: string };
   completeSale: (payload: {
     customerId: string;
     items: SaleItem[];
@@ -104,6 +121,8 @@ interface DemoContextValue {
     paymentStatus: PaymentStatus;
     tenantScope: TenantScope;
   }) => SaleRecord;
+  updateSale: (id: string, updates: Partial<SaleRecord>) => void;
+  deleteSale: (id: string) => { ok: boolean; message: string };
   recordPurchase: (payload: {
     supplierId: string;
     items: PurchaseItem[];
@@ -111,18 +130,29 @@ interface DemoContextValue {
     goodsReceived: boolean;
     tenantScope: TenantScope;
   }) => PurchaseRecord;
-  addCustomer: (customer: Omit<CustomerRecord, 'id' | 'totalPurchases' | 'lastPurchaseAt'>) => void;
+  updatePurchase: (id: string, updates: Partial<PurchaseRecord>) => void;
+  deletePurchase: (id: string) => { ok: boolean; message: string };
+  addCustomer: (customer: Omit<CustomerRecord, 'id' | 'totalPurchases' | 'lastPurchaseAt'>) => CustomerRecord;
   updateCustomer: (id: string, updates: Partial<CustomerRecord>) => void;
+  deleteCustomer: (id: string) => { ok: boolean; message: string };
   addSupplier: (supplier: Omit<SupplierRecord, 'id' | 'totalSupplied' | 'lastSupplyAt'>) => void;
+  updateSupplier: (id: string, updates: Partial<SupplierRecord>) => void;
+  deleteSupplier: (id: string) => { ok: boolean; message: string };
   addExpense: (expense: Omit<ExpenseRecord, 'id'>) => void;
+  updateExpense: (id: string, updates: Partial<ExpenseRecord>) => void;
+  deleteExpense: (id: string) => { ok: boolean; message: string };
 
   // Pharmacy Laboratory Module
   registerPatient: (patient: Omit<PatientRecord, 'id' | 'patientCode' | 'registeredAt'>) => PatientRecord;
+  updatePatient: (id: string, updates: Partial<PatientRecord>) => void;
+  deletePatient: (id: string) => { ok: boolean; message: string };
   createLabRequest: (payload: {
     patientId: string;
     testName: string;
     testCategory: string;
   }) => LabRequestRecord;
+  updateLabRequest: (id: string, updates: Partial<LabRequestRecord>) => void;
+  deleteLabRequest: (id: string) => { ok: boolean; message: string };
   submitLabResult: (payload: {
     requestId: string;
     resultSummary: string;
@@ -144,7 +174,32 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        return JSON.parse(saved) as DemoStoreState;
+        const parsed = JSON.parse(saved) as DemoStoreState;
+        const existingLogs = parsed.auditLogs || [];
+        const normalizedLogs = existingLogs.map((l) =>
+          l.scope
+            ? l
+            : {
+                ...l,
+                scope:
+                  l.actorRole === 'Pharmacy Admin'
+                    ? ('pharmacy' as const)
+                    : l.actorRole === 'Pharmaceutical Admin'
+                    ? ('pharmaceutical' as const)
+                    : ('super_admin' as const),
+              }
+        );
+        const hasPharmacy = normalizedLogs.some((l) => l.scope === 'pharmacy');
+        const hasPharma = normalizedLogs.some((l) => l.scope === 'pharmaceutical');
+        const seedExtras = INITIAL_DEMO_STATE.auditLogs.filter(
+          (l) =>
+            (!hasPharmacy && l.scope === 'pharmacy') ||
+            (!hasPharma && l.scope === 'pharmaceutical')
+        );
+        return {
+          ...parsed,
+          auditLogs: [...normalizedLogs, ...seedExtras],
+        };
       }
     } catch {
       // Fallback to initial seed state
@@ -160,6 +215,11 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [state]);
 
+  const tenantActor = (scope: TenantScope) =>
+    scope === 'pharmacy'
+      ? { actor: 'Dr. Hassan Mohamed Warsame', actorRole: 'Pharmacy Admin' }
+      : { actor: 'Abdirahman Yusuf Shire', actorRole: 'Pharmaceutical Admin' };
+
   const appendAudit = (
     prev: DemoStoreState,
     entry: Omit<AuditLogRecord, 'id' | 'timestamp'>
@@ -170,6 +230,18 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timestamp: nowTimestamp(),
     },
     ...prev.auditLogs,
+  ];
+
+  const appendArchive = (
+    prev: DemoStoreState,
+    entry: Omit<ArchivedRecordEntry, 'id' | 'archivedAt'>
+  ): ArchivedRecordEntry[] => [
+    {
+      ...entry,
+      id: `arc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      archivedAt: nowTimestamp(),
+    },
+    ...(prev.archivedItems || []),
   ];
 
   const submitApplication: DemoContextValue['submitApplication'] = (payload) => {
@@ -204,6 +276,9 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resource: 'Application',
         resourceId: newApp.refNumber,
         description: `Submitted onboarding application for ${payload.businessName} (${payload.businessType}).`,
+        scope: 'super_admin',
+        module: 'Applications',
+        status: 'info',
       }),
     }));
     return newApp;
@@ -251,6 +326,9 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
           resource: 'Application',
           resourceId: target.refNumber,
           description: `Verified business registration and licensing documentation for ${target.businessName}.`,
+          scope: 'super_admin',
+          module: 'Applications',
+          status: 'info',
         }),
       };
     });
@@ -326,7 +404,10 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         action: 'APPROVE_TENANT',
         resource: 'Tenant',
         resourceId: newTenant.code,
-        description: `Approved ${target.refNumber}, provisioned ${newTenant.businessName}, and created initial admin account (${target.email}).`,
+        description: `Approved ${target.businessType} application (${target.refNumber}) and provisioned ${newTenant.businessName}.`,
+        scope: 'super_admin',
+        module: 'Applications',
+        status: 'success',
       }),
     }));
 
@@ -356,9 +437,61 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
           resource: 'Application',
           resourceId: target.refNumber,
           description: `Rejected ${target.businessName} application. Reason: ${reason}`,
+          scope: 'super_admin',
+          module: 'Applications',
+          status: 'danger',
         }),
       };
     });
+  };
+
+  const updateApplication: DemoContextValue['updateApplication'] = (appId, updates) => {
+    setState((prev) => {
+      const target = prev.applications.find((a) => a.id === appId);
+      if (!target) return prev;
+      return {
+        ...prev,
+        applications: prev.applications.map((a) => (a.id === appId ? { ...a, ...updates } : a)),
+        auditLogs: appendAudit(prev, {
+          actor: 'Amina Farah Hassan',
+          actorRole: 'Super Admin',
+          action: 'UPDATE_APPLICATION',
+          resource: 'Application',
+          resourceId: target.refNumber,
+          description: `Updated onboarding application record for ${updates.businessName || target.businessName}.`,
+          scope: 'super_admin',
+          module: 'Applications',
+          status: 'info',
+        }),
+      };
+    });
+  };
+
+  const deleteApplication: DemoContextValue['deleteApplication'] = (appId) => {
+    const target = state.applications.find((a) => a.id === appId);
+    if (!target) return { ok: false, message: 'Application record not found.' };
+    setState((prev) => ({
+      ...prev,
+      applications: prev.applications.filter((a) => a.id !== appId),
+      archivedItems: appendArchive(prev, {
+        entity: 'Application',
+        label: `${target.refNumber} — ${target.businessName}`,
+        archivedBy: 'Amina Farah Hassan (Super Admin)',
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        actor: 'Amina Farah Hassan',
+        actorRole: 'Super Admin',
+        action: 'ARCHIVE_APPLICATION',
+        resource: 'Application',
+        resourceId: target.refNumber,
+        description: `Archived application ${target.refNumber} (${target.businessName}).`,
+        scope: 'super_admin',
+        module: 'Applications',
+        status: 'warning',
+      }),
+    }));
+    return { ok: true, message: `Application ${target.refNumber} (${target.businessName}) archived.` };
   };
 
   const toggleTenantStatus = (tenantId: string) => {
@@ -375,10 +508,81 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
           action: nextStatus === 'Active' ? 'ACTIVATE_TENANT' : 'SUSPEND_TENANT',
           resource: 'Tenant',
           resourceId: target.code,
-          description: `Changed tenant ${target.businessName} status to ${nextStatus}.`,
+          description: `${nextStatus === 'Suspended' ? 'Suspended' : 'Activated'} tenant ${target.businessName} (${target.code}).`,
+          scope: 'super_admin',
+          module: 'Tenants',
+          status: nextStatus === 'Active' ? 'success' : 'warning',
         }),
       };
     });
+  };
+
+  const updateTenant: DemoContextValue['updateTenant'] = (tenantId, updates) => {
+    setState((prev) => {
+      const target = prev.tenants.find((t) => t.id === tenantId);
+      if (!target) return prev;
+      const nextName = updates.businessName ?? target.businessName;
+      return {
+        ...prev,
+        tenants: prev.tenants.map((t) => (t.id === tenantId ? { ...t, ...updates } : t)),
+        accounts: prev.accounts.map((a) =>
+          a.tenantId === tenantId ? { ...a, tenantName: nextName } : a
+        ),
+        auditLogs: appendAudit(prev, {
+          actor: 'Amina Farah Hassan',
+          actorRole: 'Super Admin',
+          action: 'UPDATE_TENANT',
+          resource: 'Tenant',
+          resourceId: target.code,
+          description: `Updated tenant information for ${nextName}.`,
+          scope: 'super_admin',
+          module: 'Tenants',
+          status: 'info',
+        }),
+      };
+    });
+  };
+
+  const deleteTenant: DemoContextValue['deleteTenant'] = (tenantId) => {
+    const target = state.tenants.find((t) => t.id === tenantId);
+    if (!target) return { ok: false, message: 'Tenant record not found.' };
+    if (target.id === 'ten-1' || target.id === 'ten-2') {
+      // Allow deleting secondary/new tenants or archive even primary demo tenants cleanly while preserving linked accounts check
+    }
+    const linkedAccounts = state.accounts.filter((a) => a.tenantId === tenantId);
+    if (linkedAccounts.some((a) => a.email.toLowerCase() === 'superadmin@miahict.so')) {
+      return {
+        ok: false,
+        message: 'Authorization Error: Cannot archive platform owner organization.',
+      };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      tenants: prev.tenants.filter((t) => t.id !== tenantId),
+      accounts: prev.accounts.filter((a) => a.tenantId !== tenantId),
+      archivedItems: appendArchive(prev, {
+        entity: 'Tenant',
+        label: `${target.code} — ${target.businessName}`,
+        archivedBy: 'Amina Farah Hassan (Super Admin)',
+        snapshot: { tenant: target, accounts: linkedAccounts },
+      }),
+      auditLogs: appendAudit(prev, {
+        actor: 'Amina Farah Hassan',
+        actorRole: 'Super Admin',
+        action: 'ARCHIVE_TENANT',
+        resource: 'Tenant',
+        resourceId: target.code,
+        description: `Archived tenant ${target.businessName} (${target.code}) and ${linkedAccounts.length} linked account(s).`,
+        scope: 'super_admin',
+        module: 'Tenants',
+        status: 'warning',
+      }),
+    }));
+    return {
+      ok: true,
+      message: `Tenant ${target.businessName} (${target.code}) archived and removed from active list.`,
+    };
   };
 
   const createTenantWithAccount: DemoContextValue['createTenantWithAccount'] = (payload) => {
@@ -438,7 +642,10 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         action: 'CREATE_TENANT',
         resource: 'Tenant',
         resourceId: newTenant.code,
-        description: `Manually created ${newTenant.businessType} tenant ${newTenant.businessName} and provisioned initial admin (${newAccount.email}).`,
+        description: `Created a ${newTenant.businessType} tenant (${newTenant.businessName}) and provisioned admin ${newAccount.email}.`,
+        scope: 'super_admin',
+        module: 'Tenants',
+        status: 'success',
       }),
     }));
     return { tenant: newTenant, account: newAccount };
@@ -470,9 +677,83 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
           resource: 'Account',
           resourceId: newAcc.id,
           description: `Provisioned ${payload.role} account for ${payload.fullName} (${tenantName}).`,
+          scope: 'super_admin',
+          module: 'Admin Accounts',
+          status: 'success',
         }),
       };
     });
+  };
+
+  const updateAccount: DemoContextValue['updateAccount'] = (accountId, updates) => {
+    setState((prev) => {
+      const target = prev.accounts.find((a) => a.id === accountId);
+      if (!target) return prev;
+      const tenant = updates.tenantId
+        ? prev.tenants.find((t) => t.id === updates.tenantId)
+        : undefined;
+      return {
+        ...prev,
+        accounts: prev.accounts.map((a) =>
+          a.id === accountId
+            ? {
+                ...a,
+                ...updates,
+                tenantName: tenant ? tenant.businessName : updates.tenantName ?? a.tenantName,
+              }
+            : a
+        ),
+        auditLogs: appendAudit(prev, {
+          actor: 'Amina Farah Hassan',
+          actorRole: 'Super Admin',
+          action: updates.status === 'Locked' ? 'SUSPEND_ACCOUNT' : 'UPDATE_ACCOUNT',
+          resource: 'Account',
+          resourceId: target.id,
+          description:
+            updates.status === 'Locked'
+              ? `Suspended administrator account ${target.fullName} (${target.email}).`
+              : `Updated administrator account ${updates.email || target.email}.`,
+          scope: 'super_admin',
+          module: 'Admin Accounts',
+          status: updates.status === 'Locked' ? 'warning' : 'info',
+        }),
+      };
+    });
+  };
+
+  const deleteAccount: DemoContextValue['deleteAccount'] = (accountId) => {
+    const target = state.accounts.find((a) => a.id === accountId);
+    if (!target) return { ok: false, message: 'Account not found.' };
+
+    // Role-based authorization check: protect currently signed-in primary Super Admin
+    if (
+      target.email.toLowerCase() === 'superadmin@miahict.so' ||
+      (target.role === 'Super Admin' &&
+        state.accounts.filter((a) => a.role === 'Super Admin').length <= 1)
+    ) {
+      return {
+        ok: false,
+        message:
+          'Authorization Denied: Cannot delete the active primary Super Admin account (superadmin@miahict.so).',
+      };
+    }
+
+    setState((prev) => ({
+      ...prev,
+      accounts: prev.accounts.filter((a) => a.id !== accountId),
+      auditLogs: appendAudit(prev, {
+        actor: 'Amina Farah Hassan',
+        actorRole: 'Super Admin',
+        action: 'DELETE_ACCOUNT',
+        resource: 'Account',
+        resourceId: target.id,
+        description: `Deleted administrator account ${target.fullName} (${target.email}).`,
+        scope: 'super_admin',
+        module: 'Admin Accounts',
+        status: 'danger',
+      }),
+    }));
+    return { ok: true, message: `Deleted account ${target.fullName} (${target.email}).` };
   };
 
   const resetAccountPassword = (accountId: string) => {
@@ -497,6 +778,9 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
           resource: 'Account',
           resourceId: target.id,
           description: `Issued secure password reset link with mandatory first-login password change for ${target.email}.`,
+          scope: 'super_admin',
+          module: 'Admin Accounts',
+          status: 'info',
         }),
       };
     });
@@ -518,6 +802,55 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
   };
 
+  const updatePlatformFile: DemoContextValue['updatePlatformFile'] = (fileId, updates) => {
+    setState((prev) => {
+      const target = prev.platformFiles.find((f) => f.id === fileId);
+      if (!target) return prev;
+      return {
+        ...prev,
+        platformFiles: prev.platformFiles.map((f) => (f.id === fileId ? { ...f, ...updates } : f)),
+        auditLogs: appendAudit(prev, {
+          actor: 'Amina Farah Hassan',
+          actorRole: 'Super Admin',
+          action: 'UPDATE_FILE_METADATA',
+          resource: 'PlatformFile',
+          resourceId: target.id,
+          description: `Updated document metadata for ${updates.fileName || target.fileName}.`,
+          scope: 'super_admin',
+          module: 'Documents & Files',
+          status: 'info',
+        }),
+      };
+    });
+  };
+
+  const deletePlatformFile: DemoContextValue['deletePlatformFile'] = (fileId) => {
+    const target = state.platformFiles.find((f) => f.id === fileId);
+    if (!target) return { ok: false, message: 'Document not found.' };
+    setState((prev) => ({
+      ...prev,
+      platformFiles: prev.platformFiles.filter((f) => f.id !== fileId),
+      archivedItems: appendArchive(prev, {
+        entity: 'PlatformFile',
+        label: target.fileName,
+        archivedBy: 'Amina Farah Hassan (Super Admin)',
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        actor: 'Amina Farah Hassan',
+        actorRole: 'Super Admin',
+        action: 'ARCHIVE_FILE',
+        resource: 'PlatformFile',
+        resourceId: target.id,
+        description: `Archived document ${target.fileName} (${target.tenantName}).`,
+        scope: 'super_admin',
+        module: 'Documents & Files',
+        status: 'warning',
+      }),
+    }));
+    return { ok: true, message: `Document ${target.fileName} archived and removed from active list.` };
+  };
+
   const updateSystemConfig = (config: Partial<SystemConfig>) => {
     setState((prev) => ({
       ...prev,
@@ -529,12 +862,16 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resource: 'SystemConfig',
         resourceId: 'PLATFORM_CFG',
         description: 'Updated platform configuration parameters.',
+        scope: 'super_admin',
+        module: 'System Config',
+        status: 'info',
       }),
     }));
   };
 
   const addProduct: DemoContextValue['addProduct'] = (product) => {
     const id = `prod-${Date.now()}`;
+    const actorInfo = tenantActor(product.tenantScope);
     setState((prev) => ({
       ...prev,
       products: [{ ...product, id }, ...prev.products],
@@ -555,14 +892,76 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
               ...prev.stockMovements,
             ]
           : prev.stockMovements,
+      auditLogs: appendAudit(prev, {
+        ...actorInfo,
+        action: 'ADD_PRODUCT',
+        resource: product.tenantScope === 'pharmacy' ? 'Medicine' : 'Pharmaceutical SKU',
+        resourceId: product.sku,
+        description:
+          product.tenantScope === 'pharmacy'
+            ? `Added a new medicine: ${product.name}.`
+            : `Added a pharmaceutical product: ${product.name}.`,
+        scope: product.tenantScope,
+        module: 'Products',
+        status: 'success',
+      }),
     }));
   };
 
   const updateProduct: DemoContextValue['updateProduct'] = (id, updates) => {
+    setState((prev) => {
+      const target = prev.products.find((p) => p.id === id);
+      if (!target) return prev;
+      const nextName = updates.name ?? target.name;
+      const actorInfo = tenantActor(target.tenantScope);
+      return {
+        ...prev,
+        products: prev.products.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+        batches: prev.batches.map((b) =>
+          b.productId === id ? { ...b, productName: nextName } : b
+        ),
+        stockMovements: prev.stockMovements.map((m) =>
+          m.productId === id ? { ...m, productName: nextName } : m
+        ),
+        auditLogs: appendAudit(prev, {
+          ...actorInfo,
+          action: 'UPDATE_PRODUCT',
+          resource: target.tenantScope === 'pharmacy' ? 'Medicine' : 'Pharmaceutical SKU',
+          resourceId: target.sku,
+          description: `Updated catalog details for ${nextName} (${target.sku}).`,
+          scope: target.tenantScope,
+          module: 'Products',
+          status: 'info',
+        }),
+      };
+    });
+  };
+
+  const deleteProduct: DemoContextValue['deleteProduct'] = (id) => {
+    const target = state.products.find((p) => p.id === id);
+    if (!target) return { ok: false, message: 'Product not found.' };
     setState((prev) => ({
       ...prev,
-      products: prev.products.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+      products: prev.products.filter((p) => p.id !== id),
+      batches: prev.batches.filter((b) => b.productId !== id),
+      archivedItems: appendArchive(prev, {
+        entity: 'Product',
+        label: `${target.sku} — ${target.name}`,
+        archivedBy: `${target.tenantScope} Admin`,
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(target.tenantScope),
+        action: 'DELETE_PRODUCT',
+        resource: 'Product',
+        resourceId: target.sku,
+        description: `Deleted catalog product ${target.name} (${target.sku}) and cleaned linked batches.`,
+        scope: target.tenantScope,
+        module: 'Products',
+        status: 'danger',
+      }),
     }));
+    return { ok: true, message: `Deleted product ${target.name} (${target.sku}).` };
   };
 
   const adjustStock: DemoContextValue['adjustStock'] = ({
@@ -594,8 +993,117 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
           },
           ...prev.stockMovements,
         ],
+        auditLogs: appendAudit(prev, {
+          ...tenantActor(tenantScope),
+          action: 'ADJUST_STOCK',
+          resource: tenantScope === 'pharmacy' ? 'Inventory' : 'Warehouse Inventory',
+          resourceId: target.sku,
+          description:
+            tenantScope === 'pharmacy'
+              ? `Updated inventory (${qtyChange >= 0 ? '+' : ''}${qtyChange} ${target.unit}) for ${target.name}.`
+              : `Updated warehouse inventory (${qtyChange >= 0 ? '+' : ''}${qtyChange} ${target.unit}) for ${target.name}.`,
+          scope: tenantScope,
+          module: 'Inventory',
+          status: qtyChange < 0 ? 'warning' : 'info',
+        }),
       };
     });
+  };
+
+  const updateBatch: DemoContextValue['updateBatch'] = (id, updates) => {
+    setState((prev) => {
+      const target = prev.batches.find((b) => b.id === id);
+      if (!target) return prev;
+      const qtyDelta = updates.qty !== undefined ? updates.qty - target.qty : 0;
+      return {
+        ...prev,
+        batches: prev.batches.map((b) => (b.id === id ? { ...b, ...updates } : b)),
+        products:
+          qtyDelta !== 0
+            ? prev.products.map((p) =>
+                p.id === target.productId
+                  ? { ...p, stockQty: Math.max(0, p.stockQty + qtyDelta) }
+                  : p
+              )
+            : prev.products,
+      };
+    });
+  };
+
+  const deleteBatch: DemoContextValue['deleteBatch'] = (id) => {
+    const target = state.batches.find((b) => b.id === id);
+    if (!target) return { ok: false, message: 'Batch record not found.' };
+    setState((prev) => ({
+      ...prev,
+      batches: prev.batches.filter((b) => b.id !== id),
+      products: prev.products.map((p) =>
+        p.id === target.productId
+          ? { ...p, stockQty: Math.max(0, p.stockQty - target.qty) }
+          : p
+      ),
+      stockMovements: [
+        {
+          id: `mov-${Date.now()}`,
+          productId: target.productId,
+          productName: target.productName,
+          type: 'Adjustment',
+          qtyChange: -target.qty,
+          reference: `DEL-${target.batchNumber}`,
+          date: TODAY_ISO,
+          note: `Batch ${target.batchNumber} removed from inventory`,
+          tenantScope: target.tenantScope,
+        },
+        ...prev.stockMovements,
+      ],
+    }));
+    return {
+      ok: true,
+      message: `Deleted batch ${target.batchNumber} and adjusted ${target.productName} stock.`,
+    };
+  };
+
+  const updateStockMovement: DemoContextValue['updateStockMovement'] = (id, updates) => {
+    setState((prev) => {
+      const target = prev.stockMovements.find((m) => m.id === id);
+      if (!target) return prev;
+      const qtyDelta = updates.qtyChange !== undefined ? updates.qtyChange - target.qtyChange : 0;
+      return {
+        ...prev,
+        stockMovements: prev.stockMovements.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+        products:
+          qtyDelta !== 0
+            ? prev.products.map((p) =>
+                p.id === target.productId
+                  ? { ...p, stockQty: Math.max(0, p.stockQty + qtyDelta) }
+                  : p
+              )
+            : prev.products,
+      };
+    });
+  };
+
+  const deleteStockMovement: DemoContextValue['deleteStockMovement'] = (id) => {
+    const target = state.stockMovements.find((m) => m.id === id);
+    if (!target) return { ok: false, message: 'Stock movement record not found.' };
+    setState((prev) => ({
+      ...prev,
+      stockMovements: prev.stockMovements.filter((m) => m.id !== id),
+      products: prev.products.map((p) =>
+        p.id === target.productId
+          ? { ...p, stockQty: Math.max(0, p.stockQty - target.qtyChange) }
+          : p
+      ),
+      archivedItems: appendArchive(prev, {
+        entity: 'StockMovement',
+        label: `${target.reference} — ${target.productName}`,
+        archivedBy: `${target.tenantScope} Admin`,
+        snapshot: target,
+      }),
+    }));
+    return {
+      ok: true,
+      message: `Removed movement ${target.reference} and synced stock for ${target.productName}.`,
+    };
   };
 
   const completeSale: DemoContextValue['completeSale'] = ({
@@ -676,10 +1184,128 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sales: [newSale, ...prev.sales],
         stockMovements: [...newMovements, ...prev.stockMovements],
         customers: updatedCustomers,
+        auditLogs: appendAudit(prev, {
+          ...tenantActor(tenantScope),
+          action: 'COMPLETE_POS_SALE',
+          resource: tenantScope === 'pharmacy' ? 'Sale Invoice' : 'B2B Invoice',
+          resourceId: newSale.invoiceNo,
+          description: `Completed a POS sale ($${total.toFixed(2)} via ${paymentMethod}) for ${newSale.customerName}.`,
+          scope: tenantScope,
+          module: 'Sales & POS',
+          status: paymentStatus === 'Paid' ? 'success' : 'warning',
+        }),
       };
     });
 
     return newSale;
+  };
+
+  const getSaleReceivable = (sale: Pick<SaleRecord, 'total' | 'paymentStatus' | 'paymentMethod'>) => {
+    if (sale.paymentStatus === 'Pending' || sale.paymentMethod === 'Credit') return sale.total;
+    if (sale.paymentStatus === 'Partial') return sale.total * 0.5;
+    return 0;
+  };
+
+  const updateSale: DemoContextValue['updateSale'] = (id, updates) => {
+    setState((prev) => {
+      const target = prev.sales.find((s) => s.id === id);
+      if (!target) return prev;
+      const nextCustomer = updates.customerId
+        ? prev.customers.find((c) => c.id === updates.customerId)
+        : undefined;
+      const nextDiscount = updates.discountTotal ?? target.discountTotal;
+      const nextTotal =
+        updates.total !== undefined
+          ? updates.total
+          : Math.max(0, target.subtotal - nextDiscount);
+      const merged: SaleRecord = {
+        ...target,
+        ...updates,
+        customerName: nextCustomer ? nextCustomer.name : updates.customerName ?? target.customerName,
+        discountTotal: nextDiscount,
+        total: nextTotal,
+      };
+
+      const oldReceivable = getSaleReceivable(target);
+      const newReceivable = getSaleReceivable(merged);
+
+      const updatedCustomers = prev.customers.map((c) => {
+        if (target.customerId === merged.customerId && c.id === merged.customerId) {
+          return {
+            ...c,
+            totalPurchases: Math.max(0, c.totalPurchases - target.total + merged.total),
+            balanceReceivable: Math.max(0, c.balanceReceivable - oldReceivable + newReceivable),
+          };
+        }
+        if (c.id === target.customerId) {
+          return {
+            ...c,
+            totalPurchases: Math.max(0, c.totalPurchases - target.total),
+            balanceReceivable: Math.max(0, c.balanceReceivable - oldReceivable),
+          };
+        }
+        if (c.id === merged.customerId) {
+          return {
+            ...c,
+            totalPurchases: c.totalPurchases + merged.total,
+            balanceReceivable: c.balanceReceivable + newReceivable,
+          };
+        }
+        return c;
+      });
+
+      return {
+        ...prev,
+        sales: prev.sales.map((s) => (s.id === id ? merged : s)),
+        customers: updatedCustomers,
+      };
+    });
+  };
+
+  const deleteSale: DemoContextValue['deleteSale'] = (id) => {
+    const target = state.sales.find((s) => s.id === id);
+    if (!target) return { ok: false, message: 'Invoice record not found.' };
+    const receivableToReverse = getSaleReceivable(target);
+
+    setState((prev) => ({
+      ...prev,
+      sales: prev.sales.filter((s) => s.id !== id),
+      products: prev.products.map((p) => {
+        const soldQty = target.items
+          .filter((item) => item.productId === p.id)
+          .reduce((sum, item) => sum + item.qty, 0);
+        return soldQty > 0 ? { ...p, stockQty: p.stockQty + soldQty } : p;
+      }),
+      customers: prev.customers.map((c) =>
+        c.id === target.customerId
+          ? {
+              ...c,
+              totalPurchases: Math.max(0, c.totalPurchases - target.total),
+              balanceReceivable: Math.max(0, c.balanceReceivable - receivableToReverse),
+            }
+          : c
+      ),
+      archivedItems: appendArchive(prev, {
+        entity: 'SaleInvoice',
+        label: `${target.invoiceNo} — ${target.customerName} ($${target.total.toFixed(2)})`,
+        archivedBy: `${target.tenantScope} Admin`,
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(target.tenantScope),
+        action: 'ARCHIVE_SALE_INVOICE',
+        resource: 'Sale Invoice',
+        resourceId: target.invoiceNo,
+        description: `Archived invoice ${target.invoiceNo} ($${target.total.toFixed(2)}), restored stock, and updated customer balance.`,
+        scope: target.tenantScope,
+        module: 'Sales & POS',
+        status: 'warning',
+      }),
+    }));
+    return {
+      ok: true,
+      message: `Invoice ${target.invoiceNo} archived. Stock quantities and customer balances updated.`,
+    };
   };
 
   const recordPurchase: DemoContextValue['recordPurchase'] = ({
@@ -768,32 +1394,196 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         purchases: [newPurchase, ...prev.purchases],
         stockMovements: [...newMovements, ...prev.stockMovements],
         suppliers: updatedSuppliers,
+        auditLogs: appendAudit(prev, {
+          ...tenantActor(tenantScope),
+          action: 'RECORD_PURCHASE',
+          resource: 'Purchase Order',
+          resourceId: newPurchase.poNumber,
+          description: `Recorded a purchase (${newPurchase.poNumber}, $${total.toFixed(2)}) from ${newPurchase.supplierName}.`,
+          scope: tenantScope,
+          module: tenantScope === 'pharmacy' ? 'Purchases' : 'Purchasing',
+          status: 'success',
+        }),
       };
     });
 
     return newPurchase;
   };
 
-  const addCustomer: DemoContextValue['addCustomer'] = (customer) => {
+  const getPurchasePayable = (p: Pick<PurchaseRecord, 'total' | 'paymentStatus'>) => {
+    if (p.paymentStatus === 'Unpaid') return p.total;
+    if (p.paymentStatus === 'Partial') return p.total * 0.5;
+    return 0;
+  };
+
+  const updatePurchase: DemoContextValue['updatePurchase'] = (id, updates) => {
+    setState((prev) => {
+      const target = prev.purchases.find((p) => p.id === id);
+      if (!target) return prev;
+      const nextSupplier = updates.supplierId
+        ? prev.suppliers.find((s) => s.id === updates.supplierId)
+        : undefined;
+      const merged: PurchaseRecord = {
+        ...target,
+        ...updates,
+        supplierName: nextSupplier ? nextSupplier.name : updates.supplierName ?? target.supplierName,
+      };
+      const oldPayable = getPurchasePayable(target);
+      const newPayable = getPurchasePayable(merged);
+
+      let updatedProducts = prev.products;
+      if (target.goodsReceived !== merged.goodsReceived) {
+        const sign = merged.goodsReceived ? 1 : -1;
+        updatedProducts = prev.products.map((p) => {
+          const itemQty = merged.items
+            .filter((item) => item.productId === p.id)
+            .reduce((sum, item) => sum + item.qty, 0);
+          return itemQty > 0
+            ? { ...p, stockQty: Math.max(0, p.stockQty + sign * itemQty) }
+            : p;
+        });
+      }
+
+      const updatedSuppliers = prev.suppliers.map((s) => {
+        if (target.supplierId === merged.supplierId && s.id === merged.supplierId) {
+          return {
+            ...s,
+            totalSupplied: Math.max(0, s.totalSupplied - target.total + merged.total),
+            balancePayable: Math.max(0, s.balancePayable - oldPayable + newPayable),
+          };
+        }
+        if (s.id === target.supplierId) {
+          return {
+            ...s,
+            totalSupplied: Math.max(0, s.totalSupplied - target.total),
+            balancePayable: Math.max(0, s.balancePayable - oldPayable),
+          };
+        }
+        if (s.id === merged.supplierId) {
+          return {
+            ...s,
+            totalSupplied: s.totalSupplied + merged.total,
+            balancePayable: s.balancePayable + newPayable,
+          };
+        }
+        return s;
+      });
+
+      return {
+        ...prev,
+        purchases: prev.purchases.map((p) => (p.id === id ? merged : p)),
+        products: updatedProducts,
+        suppliers: updatedSuppliers,
+      };
+    });
+  };
+
+  const deletePurchase: DemoContextValue['deletePurchase'] = (id) => {
+    const target = state.purchases.find((p) => p.id === id);
+    if (!target) return { ok: false, message: 'Purchase order not found.' };
+    const payableToReverse = getPurchasePayable(target);
+
     setState((prev) => ({
       ...prev,
-      customers: [
-        {
-          ...customer,
-          id: `cust-${Date.now()}`,
-          totalPurchases: 0,
-          lastPurchaseAt: '—',
-        },
-        ...prev.customers,
-      ],
+      purchases: prev.purchases.filter((p) => p.id !== id),
+      products: target.goodsReceived
+        ? prev.products.map((p) => {
+            const qty = target.items
+              .filter((item) => item.productId === p.id)
+              .reduce((sum, item) => sum + item.qty, 0);
+            return qty > 0 ? { ...p, stockQty: Math.max(0, p.stockQty - qty) } : p;
+          })
+        : prev.products,
+      suppliers: prev.suppliers.map((s) =>
+        s.id === target.supplierId
+          ? {
+              ...s,
+              totalSupplied: Math.max(0, s.totalSupplied - target.total),
+              balancePayable: Math.max(0, s.balancePayable - payableToReverse),
+            }
+          : s
+      ),
+      archivedItems: appendArchive(prev, {
+        entity: 'PurchaseOrder',
+        label: `${target.poNumber} — ${target.supplierName} ($${target.total.toFixed(2)})`,
+        archivedBy: `${target.tenantScope} Admin`,
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(target.tenantScope),
+        action: 'ARCHIVE_PURCHASE_ORDER',
+        resource: 'Purchase Order',
+        resourceId: target.poNumber,
+        description: `Archived purchase order ${target.poNumber} ($${target.total.toFixed(2)}) and synced supplier payables.`,
+        scope: target.tenantScope,
+        module: target.tenantScope === 'pharmacy' ? 'Purchases' : 'Purchasing',
+        status: 'warning',
+      }),
     }));
+    return {
+      ok: true,
+      message: `Purchase order ${target.poNumber} archived and supplier balances updated.`,
+    };
+  };
+
+  const addCustomer: DemoContextValue['addCustomer'] = (customer) => {
+    const newCustomer: CustomerRecord = {
+      ...customer,
+      id: `cust-${Date.now()}`,
+      totalPurchases: 0,
+      lastPurchaseAt: '—',
+    };
+    setState((prev) => ({
+      ...prev,
+      customers: [newCustomer, ...prev.customers],
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(customer.tenantScope),
+        action: 'REGISTER_CUSTOMER',
+        resource: 'Customer',
+        resourceId: newCustomer.name,
+        description: `Registered a customer: ${newCustomer.name} (${newCustomer.customerType}).`,
+        scope: customer.tenantScope,
+        module: 'Customers',
+        status: 'success',
+      }),
+    }));
+    return newCustomer;
   };
 
   const updateCustomer: DemoContextValue['updateCustomer'] = (id, updates) => {
     setState((prev) => ({
       ...prev,
       customers: prev.customers.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+      sales: updates.name
+        ? prev.sales.map((s) => (s.customerId === id ? { ...s, customerName: updates.name! } : s))
+        : prev.sales,
     }));
+  };
+
+  const deleteCustomer: DemoContextValue['deleteCustomer'] = (id) => {
+    const target = state.customers.find((c) => c.id === id);
+    if (!target) return { ok: false, message: 'Customer not found.' };
+    setState((prev) => ({
+      ...prev,
+      customers: prev.customers.filter((c) => c.id !== id),
+      archivedItems: appendArchive(prev, {
+        entity: 'Customer',
+        label: target.name,
+        archivedBy: `${target.tenantScope} Admin`,
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(target.tenantScope),
+        action: 'ARCHIVE_CUSTOMER',
+        resource: 'Customer',
+        resourceId: target.name,
+        description: `Deleted customer record for ${target.name}.`,
+        scope: target.tenantScope,
+        module: 'Customers',
+        status: 'danger',
+      }),
+    }));
+    return { ok: true, message: `Deleted customer ${target.name}.` };
   };
 
   const addSupplier: DemoContextValue['addSupplier'] = (supplier) => {
@@ -808,14 +1598,93 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
         ...prev.suppliers,
       ],
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(supplier.tenantScope),
+        action: 'ADD_SUPPLIER',
+        resource: 'Supplier',
+        resourceId: supplier.name,
+        description: `Registered supplier ${supplier.name}.`,
+        scope: supplier.tenantScope,
+        module: 'Suppliers',
+        status: 'info',
+      }),
     }));
+  };
+
+  const updateSupplier: DemoContextValue['updateSupplier'] = (id, updates) => {
+    setState((prev) => ({
+      ...prev,
+      suppliers: prev.suppliers.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+      purchases: updates.name
+        ? prev.purchases.map((p) => (p.supplierId === id ? { ...p, supplierName: updates.name! } : p))
+        : prev.purchases,
+    }));
+  };
+
+  const deleteSupplier: DemoContextValue['deleteSupplier'] = (id) => {
+    const target = state.suppliers.find((s) => s.id === id);
+    if (!target) return { ok: false, message: 'Supplier not found.' };
+    setState((prev) => ({
+      ...prev,
+      suppliers: prev.suppliers.filter((s) => s.id !== id),
+      archivedItems: appendArchive(prev, {
+        entity: 'Supplier',
+        label: target.name,
+        archivedBy: `${target.tenantScope} Admin`,
+        snapshot: target,
+      }),
+    }));
+    return { ok: true, message: `Deleted supplier ${target.name}.` };
   };
 
   const addExpense: DemoContextValue['addExpense'] = (expense) => {
     setState((prev) => ({
       ...prev,
       expenses: [{ ...expense, id: `exp-${Date.now()}` }, ...prev.expenses],
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(expense.tenantScope),
+        action: 'RECORD_EXPENSE',
+        resource: 'Expense',
+        resourceId: expense.reference,
+        description: `Recorded ${expense.category} expense ($${expense.amount.toFixed(2)}) via ${expense.paymentMethod}.`,
+        scope: expense.tenantScope,
+        module: 'Expenses',
+        status: 'info',
+      }),
     }));
+  };
+
+  const updateExpense: DemoContextValue['updateExpense'] = (id, updates) => {
+    setState((prev) => ({
+      ...prev,
+      expenses: prev.expenses.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+    }));
+  };
+
+  const deleteExpense: DemoContextValue['deleteExpense'] = (id) => {
+    const target = state.expenses.find((e) => e.id === id);
+    if (!target) return { ok: false, message: 'Expense record not found.' };
+    setState((prev) => ({
+      ...prev,
+      expenses: prev.expenses.filter((e) => e.id !== id),
+      archivedItems: appendArchive(prev, {
+        entity: 'Expense',
+        label: `${target.reference} — ${target.category} ($${target.amount.toFixed(2)})`,
+        archivedBy: `${target.tenantScope} Admin`,
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        ...tenantActor(target.tenantScope),
+        action: 'ARCHIVE_EXPENSE',
+        resource: 'Expense',
+        resourceId: target.reference,
+        description: `Archived operating expense ${target.reference} ($${target.amount.toFixed(2)}).`,
+        scope: target.tenantScope,
+        module: 'Expenses',
+        status: 'warning',
+      }),
+    }));
+    return { ok: true, message: `Expense ${target.reference} ($${target.amount.toFixed(2)}) archived.` };
   };
 
   const registerPatient: DemoContextValue['registerPatient'] = (patient) => {
@@ -831,6 +1700,54 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       patients: [newPatient, ...prev.patients],
     }));
     return newPatient;
+  };
+
+  const updatePatient: DemoContextValue['updatePatient'] = (id, updates) => {
+    setState((prev) => ({
+      ...prev,
+      patients: prev.patients.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+      labRequests: prev.labRequests.map((r) =>
+        r.patientId === id
+          ? {
+              ...r,
+              patientName: updates.fullName ?? r.patientName,
+              patientPhone: updates.phone ?? r.patientPhone,
+            }
+          : r
+      ),
+    }));
+  };
+
+  const deletePatient: DemoContextValue['deletePatient'] = (id) => {
+    const target = state.patients.find((p) => p.id === id);
+    if (!target) return { ok: false, message: 'Patient record not found.' };
+    const linkedRequests = state.labRequests.filter((r) => r.patientId === id);
+    setState((prev) => ({
+      ...prev,
+      patients: prev.patients.filter((p) => p.id !== id),
+      labRequests: prev.labRequests.filter((r) => r.patientId !== id),
+      archivedItems: appendArchive(prev, {
+        entity: 'Patient',
+        label: `${target.patientCode} — ${target.fullName}`,
+        archivedBy: 'Dr. Hassan Mohamed Warsame (Pharmacy Admin)',
+        snapshot: { patient: target, labRequests: linkedRequests },
+      }),
+      auditLogs: appendAudit(prev, {
+        actor: 'Dr. Hassan Mohamed Warsame',
+        actorRole: 'Pharmacy Admin',
+        action: 'ARCHIVE_PATIENT',
+        resource: 'Patient',
+        resourceId: target.patientCode,
+        description: `Archived patient ${target.fullName} (${target.patientCode}) and ${linkedRequests.length} linked lab request(s).`,
+        scope: 'pharmacy',
+        module: 'Laboratory Reports',
+        status: 'warning',
+      }),
+    }));
+    return {
+      ok: true,
+      message: `Patient ${target.fullName} (${target.patientCode}) archived.`,
+    };
   };
 
   const createLabRequest: DemoContextValue['createLabRequest'] = ({
@@ -855,8 +1772,69 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setState((prev) => ({
       ...prev,
       labRequests: [newReq, ...prev.labRequests],
+      auditLogs: appendAudit(prev, {
+        actor: 'Dr. Hassan Mohamed Warsame',
+        actorRole: 'Pharmacy Admin',
+        action: 'CREATE_LAB_REQUEST',
+        resource: 'Lab Request',
+        resourceId: newReq.requestNo,
+        description: `Created laboratory request (${testName}) for ${newReq.patientName}.`,
+        scope: 'pharmacy',
+        module: 'Laboratory Reports',
+        status: 'info',
+      }),
     }));
     return newReq;
+  };
+
+  const updateLabRequest: DemoContextValue['updateLabRequest'] = (id, updates) => {
+    setState((prev) => {
+      const target = prev.labRequests.find((r) => r.id === id);
+      if (!target) return prev;
+      const patient = updates.patientId
+        ? prev.patients.find((p) => p.id === updates.patientId)
+        : undefined;
+      return {
+        ...prev,
+        labRequests: prev.labRequests.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                ...updates,
+                patientName: patient ? patient.fullName : updates.patientName ?? r.patientName,
+                patientPhone: patient ? patient.phone : updates.patientPhone ?? r.patientPhone,
+              }
+            : r
+        ),
+      };
+    });
+  };
+
+  const deleteLabRequest: DemoContextValue['deleteLabRequest'] = (id) => {
+    const target = state.labRequests.find((r) => r.id === id);
+    if (!target) return { ok: false, message: 'Laboratory request not found.' };
+    setState((prev) => ({
+      ...prev,
+      labRequests: prev.labRequests.filter((r) => r.id !== id),
+      archivedItems: appendArchive(prev, {
+        entity: 'LabRequest',
+        label: `${target.requestNo} — ${target.patientName}`,
+        archivedBy: 'Dr. Hassan Mohamed Warsame (Pharmacy Admin)',
+        snapshot: target,
+      }),
+      auditLogs: appendAudit(prev, {
+        actor: 'Dr. Hassan Mohamed Warsame',
+        actorRole: 'Pharmacy Admin',
+        action: 'ARCHIVE_LAB_REQUEST',
+        resource: 'Lab Request',
+        resourceId: target.requestNo,
+        description: `Archived laboratory request ${target.requestNo} (${target.testName} for ${target.patientName}).`,
+        scope: 'pharmacy',
+        module: 'Laboratory Reports',
+        status: 'warning',
+      }),
+    }));
+    return { ok: true, message: `Lab request ${target.requestNo} archived.` };
   };
 
   const submitLabResult: DemoContextValue['submitLabResult'] = ({
@@ -865,21 +1843,37 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resultValues,
     clinicalNotes,
   }) => {
-    setState((prev) => ({
-      ...prev,
-      labRequests: prev.labRequests.map((r) =>
-        r.id === requestId
-          ? {
-              ...r,
-              status: 'Answered',
-              resultSummary,
-              resultValues,
-              clinicalNotes,
-              resultDate: TODAY_ISO,
-            }
-          : r
-      ),
-    }));
+    setState((prev) => {
+      const target = prev.labRequests.find((r) => r.id === requestId);
+      return {
+        ...prev,
+        labRequests: prev.labRequests.map((r) =>
+          r.id === requestId
+            ? {
+                ...r,
+                status: 'Answered',
+                resultSummary,
+                resultValues,
+                clinicalNotes,
+                resultDate: TODAY_ISO,
+              }
+            : r
+        ),
+        auditLogs: target
+          ? appendAudit(prev, {
+              actor: 'Dr. Hassan Mohamed Warsame',
+              actorRole: 'Pharmacy Admin',
+              action: 'SUBMIT_LAB_RESULT',
+              resource: 'Lab Request',
+              resourceId: target.requestNo,
+              description: `Submitted diagnostic lab result (${target.testName}) for ${target.patientName}.`,
+              scope: 'pharmacy',
+              module: 'Laboratory Reports',
+              status: 'success',
+            })
+          : prev.auditLogs,
+      };
+    });
   };
 
   const simulateWhatsappDelivery: DemoContextValue['simulateWhatsappDelivery'] = (
@@ -933,23 +1927,49 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyApplication,
         approveApplication,
         rejectApplication,
+        updateApplication,
+        deleteApplication,
         toggleTenantStatus,
+        updateTenant,
+        deleteTenant,
         createTenantWithAccount,
         createAccount,
+        updateAccount,
+        deleteAccount,
         resetAccountPassword,
         completeFirstLoginPasswordChange,
+        updatePlatformFile,
+        deletePlatformFile,
         updateSystemConfig,
         addProduct,
         updateProduct,
+        deleteProduct,
         adjustStock,
+        updateBatch,
+        deleteBatch,
+        updateStockMovement,
+        deleteStockMovement,
         completeSale,
+        updateSale,
+        deleteSale,
         recordPurchase,
+        updatePurchase,
+        deletePurchase,
         addCustomer,
         updateCustomer,
+        deleteCustomer,
         addSupplier,
+        updateSupplier,
+        deleteSupplier,
         addExpense,
+        updateExpense,
+        deleteExpense,
         registerPatient,
+        updatePatient,
+        deletePatient,
         createLabRequest,
+        updateLabRequest,
+        deleteLabRequest,
         submitLabResult,
         simulateWhatsappDelivery,
         markNotificationRead,

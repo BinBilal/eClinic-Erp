@@ -7,16 +7,19 @@ import {
   CheckCircle2,
   ClipboardList,
   Download,
+  Edit3,
   Eye,
   FileText,
   FolderOpen,
   KeyRound,
   LayoutDashboard,
+  Lock,
   Plus,
   Search as SearchIcon,
   Settings as SettingsIcon,
   ShieldCheck,
   Sliders,
+  Trash2,
   Users,
   XCircle,
 } from 'lucide-react';
@@ -27,21 +30,20 @@ import {
 } from '../../components/ui/Charts';
 import { DashboardShell, SidebarNavItem } from '../../components/ui/DashboardShell';
 import { ColumnDef, DataTable } from '../../components/ui/DataTable';
+import { DeleteConfirmModal } from '../../components/ui/DeleteConfirmModal';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { Modal } from '../../components/ui/Modal';
 import {
-  ActivityTimelineCard,
-  ForecastCard,
   GreetingHeader,
   LeaderboardCard,
-  PipelineCard,
   RemindersCard,
-  TargetProgressCard,
 } from '../../components/ui/NexoraWidgets';
+import { RecentlyActionsCard } from '../../components/ui/RecentlyActionsCard';
 import { StatusLabel } from '../../components/ui/StatusLabel';
 import { useDemoStore } from '../../store/demoStore';
 import {
   AccountRecord,
+  AccountStatus,
   ApplicationRecord,
   ApplicationStatus,
   AuditLogRecord,
@@ -49,6 +51,7 @@ import {
   ExperienceRole,
   PlatformFileRecord,
   TenantRecord,
+  TenantStatus,
 } from '../../types/erp';
 
 interface SuperAdminDashboardProps {
@@ -117,10 +120,18 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     verifyApplication,
     approveApplication,
     rejectApplication,
+    updateApplication,
+    deleteApplication,
     toggleTenantStatus,
+    updateTenant,
+    deleteTenant,
     createTenantWithAccount,
     createAccount,
+    updateAccount,
+    deleteAccount,
     resetAccountPassword,
+    updatePlatformFile,
+    deletePlatformFile,
     updateSystemConfig,
     markNotificationRead,
     markAllNotificationsRead,
@@ -130,12 +141,27 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [activePage, setActivePage] = useState<SuperAdminPage>('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
   const [dateRange, setDateRange] = useState('Nov 19 – Nov 26, 2026');
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Applications filters & modals
   const [appStatusFilter, setAppStatusFilter] = useState<'All' | ApplicationStatus>('All');
   const [appTypeFilter, setAppTypeFilter] = useState<'All' | BusinessType>('All');
   const [selectedApp, setSelectedApp] = useState<ApplicationRecord | null>(null);
+  const [editingApp, setEditingApp] = useState<ApplicationRecord | null>(null);
+  const [editAppForm, setEditAppForm] = useState({
+    businessName: '',
+    businessType: 'Pharmacy' as BusinessType,
+    ownerName: '',
+    email: '',
+    phone: '',
+    city: '',
+    address: '',
+    registrationNumber: '',
+    licenseNumber: '',
+    facilityDetail: '',
+    notes: '',
+  });
+  const [deleteTargetApp, setDeleteTargetApp] = useState<ApplicationRecord | null>(null);
   const [rejectModalApp, setRejectModalApp] = useState<ApplicationRecord | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -146,8 +172,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     source: 'Application Approval' | 'Manual Provisioning';
   } | null>(null);
 
-  // Tenant details & manual creation modal
+  // Tenant details, edit, delete & manual creation modal
   const [selectedTenant, setSelectedTenant] = useState<TenantRecord | null>(null);
+  const [editingTenant, setEditingTenant] = useState<TenantRecord | null>(null);
+  const [editTenantForm, setEditTenantForm] = useState({
+    businessName: '',
+    businessType: 'Pharmacy' as BusinessType,
+    ownerName: '',
+    email: '',
+    phone: '',
+    city: '',
+    address: '',
+    plan: '',
+    status: 'Active' as TenantStatus,
+  });
+  const [deleteTargetTenant, setDeleteTargetTenant] = useState<TenantRecord | null>(null);
   const [createTenantOpen, setCreateTenantOpen] = useState(false);
   const [newTenantForm, setNewTenantForm] = useState({
     businessName: '',
@@ -160,7 +199,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     registrationNumber: '',
   });
 
-  // Account creation modal
+  // Account creation, view, edit & delete modals
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
   const [newAccountForm, setNewAccountForm] = useState({
     tenantId: state.tenants[0]?.id || '',
@@ -169,6 +208,29 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     role: 'Pharmacy Admin' as 'Pharmacy Admin' | 'Pharmaceutical Admin' | 'Super Admin',
     requirePasswordChange: true,
   });
+  const [viewingAccount, setViewingAccount] = useState<AccountRecord | null>(null);
+  const [editingAccount, setEditingAccount] = useState<AccountRecord | null>(null);
+  const [editAccountForm, setEditAccountForm] = useState({
+    tenantId: '',
+    fullName: '',
+    email: '',
+    role: 'Pharmacy Admin' as 'Pharmacy Admin' | 'Pharmaceutical Admin' | 'Super Admin',
+    status: 'Active' as AccountStatus,
+    requirePasswordChange: false,
+  });
+  const [deleteTargetAccount, setDeleteTargetAccount] = useState<AccountRecord | null>(null);
+
+  // Platform Files & Audit Log modals
+  const [viewingFile, setViewingFile] = useState<PlatformFileRecord | null>(null);
+  const [editingFile, setEditingFile] = useState<PlatformFileRecord | null>(null);
+  const [editFileForm, setEditFileForm] = useState({
+    fileName: '',
+    category: 'License' as PlatformFileRecord['category'],
+    tenantName: '',
+    size: '',
+  });
+  const [deleteTargetFile, setDeleteTargetFile] = useState<PlatformFileRecord | null>(null);
+  const [viewingAudit, setViewingAudit] = useState<AuditLogRecord | null>(null);
 
   // Reports tab & date filter
   const [reportTab, setReportTab] = useState<
@@ -179,14 +241,25 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   // System config draft
   const [configDraft, setConfigDraft] = useState(state.systemConfig);
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 4000);
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message: msg, type });
+    setTimeout(() => setToast(null), 4500);
   };
 
   const superNotifications = useMemo(
     () => state.notifications.filter((n) => n.scope === 'super_admin'),
     [state.notifications]
+  );
+
+  const superAdminActivities = useMemo(
+    () =>
+      state.auditLogs.filter(
+        (l) =>
+          l.scope === 'super_admin' ||
+          (!l.scope &&
+            ['Super Admin', 'Platform Service', 'Public Applicant'].includes(l.actorRole))
+      ),
+    [state.auditLogs]
   );
 
   // KPI computations
@@ -296,14 +369,39 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       header: 'Actions',
       align: 'right',
       render: (r) => (
-        <div className="inline-flex items-center justify-end gap-1.5">
+        <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
           <button
             type="button"
+            title="View Application"
             onClick={() => setSelectedApp(r)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             <Eye className="h-3.5 w-3.5" />
             View
+          </button>
+          <button
+            type="button"
+            title="Edit Application"
+            onClick={() => {
+              setEditingApp(r);
+              setEditAppForm({
+                businessName: r.businessName,
+                businessType: r.businessType,
+                ownerName: r.ownerName,
+                email: r.email,
+                phone: r.phone,
+                city: r.city,
+                address: r.address,
+                registrationNumber: r.registrationNumber,
+                licenseNumber: r.licenseNumber,
+                facilityDetail: r.facilityDetail,
+                notes: r.notes,
+              });
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
           </button>
           {(r.status === 'Submitted' || r.status === 'Under Review') && (
             <>
@@ -322,7 +420,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     );
                   }
                 }}
-                className="px-2.5 py-1 rounded-md bg-[#16A34A] hover:bg-emerald-700 text-white text-xs font-medium"
+                className="px-2 py-1 rounded-md bg-[#16A34A] hover:bg-emerald-700 text-white text-xs font-medium"
               >
                 Approve
               </button>
@@ -332,12 +430,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   setRejectModalApp(r);
                   setRejectReason('');
                 }}
-                className="px-2.5 py-1 rounded-md bg-white dark:bg-[#0D1628] border border-red-200 dark:border-red-900/60 text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 text-xs font-medium"
+                className="px-2 py-1 rounded-md bg-white dark:bg-[#0D1628] border border-red-200 dark:border-red-900/60 text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 text-xs font-medium"
               >
                 Reject
               </button>
             </>
           )}
+          <button
+            type="button"
+            title="Archive / Delete Application"
+            onClick={() => setDeleteTargetApp(r)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
         </div>
       ),
     },
@@ -397,13 +504,37 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       header: 'Actions',
       align: 'right',
       render: (t) => (
-        <div className="inline-flex items-center justify-end gap-1.5">
+        <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
           <button
             type="button"
+            title="View Tenant"
             onClick={() => setSelectedTenant(t)}
-            className="px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
-            Details
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </button>
+          <button
+            type="button"
+            title="Edit Tenant"
+            onClick={() => {
+              setEditingTenant(t);
+              setEditTenantForm({
+                businessName: t.businessName,
+                businessType: t.businessType,
+                ownerName: t.ownerName,
+                email: t.email,
+                phone: t.phone,
+                city: t.city,
+                address: t.address,
+                plan: t.plan,
+                status: t.status,
+              });
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
           </button>
           <button
             type="button"
@@ -413,13 +544,22 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 `${t.businessName} status updated to ${t.status === 'Active' ? 'Suspended' : 'Active'}.`
               );
             }}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium border bg-white dark:bg-[#0D1628] ${
+            className={`px-2 py-1 rounded-md text-xs font-medium border bg-white dark:bg-[#0D1628] ${
               t.status === 'Active'
-                ? 'border-red-200 dark:border-red-900/60 text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50'
+                ? 'border-amber-200 dark:border-amber-900/60 text-[#D97706] dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50'
                 : 'border-emerald-200 dark:border-emerald-900/60 text-[#16A34A] dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
             }`}
           >
             {t.status === 'Active' ? 'Suspend' : 'Activate'}
+          </button>
+          <button
+            type="button"
+            title="Archive / Delete Tenant"
+            onClick={() => setDeleteTargetTenant(t)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
           </button>
         </div>
       ),
@@ -479,17 +619,57 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       header: 'Actions',
       align: 'right',
       render: (a) => (
-        <button
-          type="button"
-          onClick={() => {
-            resetAccountPassword(a.id);
-            showToast(`Password reset triggered for ${a.email}. First-login change enforced.`);
-          }}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-        >
-          <KeyRound className="h-3.5 w-3.5" />
-          Reset Password
-        </button>
+        <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+          <button
+            type="button"
+            title="View Account"
+            onClick={() => setViewingAccount(a)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </button>
+          <button
+            type="button"
+            title="Edit Account"
+            onClick={() => {
+              setEditingAccount(a);
+              setEditAccountForm({
+                tenantId: a.tenantId,
+                fullName: a.fullName,
+                email: a.email,
+                role: a.role,
+                status: a.status,
+                requirePasswordChange: a.requirePasswordChange,
+              });
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            type="button"
+            title="Reset Password"
+            onClick={() => {
+              resetAccountPassword(a.id);
+              showToast(`Password reset triggered for ${a.email}. First-login change enforced.`);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+            Reset
+          </button>
+          <button
+            type="button"
+            title="Delete Account"
+            onClick={() => setDeleteTargetAccount(a)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
       ),
     },
   ];
@@ -537,6 +717,30 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       header: 'Activity Description',
       render: (l) => <span className="text-xs text-slate-600 dark:text-slate-300">{l.description}</span>,
     },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (l) => (
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewingAudit(l)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </button>
+          <span
+            title="Audit trail records are immutable for compliance"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-500 dark:text-slate-400"
+          >
+            <Lock className="h-3 w-3" />
+            Immutable
+          </span>
+        </div>
+      ),
+    },
   ];
 
   const fileColumns: ColumnDef<PlatformFileRecord>[] = [
@@ -579,6 +783,47 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
           {f.uploadedAt}
         </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (f) => (
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewingFile(f)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingFile(f);
+              setEditFileForm({
+                fileName: f.fileName,
+                category: f.category,
+                tenantName: f.tenantName,
+                size: f.size,
+              });
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteTargetFile(f)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
       ),
     },
   ];
@@ -645,16 +890,30 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         showToast('Original sample data restored.');
       }}
     >
-      {toastMsg && (
-        <div className="mb-5 px-4 py-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-900/70 flex items-center justify-between text-xs font-medium text-emerald-900 dark:text-emerald-200">
+      {toast && (
+        <div
+          className={`mb-5 px-4 py-3 rounded-lg border flex items-center justify-between text-xs font-medium ${
+            toast.type === 'error'
+              ? 'bg-red-50 dark:bg-red-950/60 border-red-200 dark:border-red-900/70 text-red-900 dark:text-red-200'
+              : 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-900/70 text-emerald-900 dark:text-emerald-200'
+          }`}
+        >
           <span className="inline-flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-[#16A34A] dark:text-emerald-400" />
-            {toastMsg}
+            {toast.type === 'error' ? (
+              <XCircle className="h-4 w-4 text-[#DC2626] dark:text-red-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-[#16A34A] dark:text-emerald-400 shrink-0" />
+            )}
+            {toast.message}
           </span>
           <button
             type="button"
-            onClick={() => setToastMsg(null)}
-            className="text-emerald-700 dark:text-emerald-300 hover:underline"
+            onClick={() => setToast(null)}
+            className={
+              toast.type === 'error'
+                ? 'text-red-700 dark:text-red-300 hover:underline'
+                : 'text-emerald-700 dark:text-emerald-300 hover:underline'
+            }
           >
             Dismiss
           </button>
@@ -751,144 +1010,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             />
           </div>
 
-          {/* Nexora Middle Row: 5-Stage Pipeline + Target Progress Gauge */}
-          <div className="grid lg:grid-cols-12 gap-5">
-            <div className="lg:col-span-7">
-              <PipelineCard
-                title="Tenant Onboarding Pipeline"
-                actionLabel="View All"
-                onAction={() => setActivePage('applications')}
-                stages={[
-                  {
-                    id: 'submitted',
-                    title: 'Submitted',
-                    countLabel: `${
-                      state.applications.filter((a) => a.status === 'Submitted').length
-                    } Apps`,
-                    metricLabel: 'New Intake',
-                    color: '#396BA4',
-                    items: state.applications
-                      .filter((a) => a.status === 'Submitted')
-                      .map((a) => ({
-                        id: a.id,
-                        name: a.businessName,
-                        value: `${a.businessType} · ${a.city}`,
-                        initial: a.businessName[0],
-                        onClick: () => setSelectedApp(a),
-                      })),
-                  },
-                  {
-                    id: 'review',
-                    title: 'Under Review',
-                    countLabel: `${
-                      state.applications.filter((a) => a.status === 'Under Review').length
-                    } Apps`,
-                    metricLabel: 'MOH Check',
-                    color: '#D97706',
-                    items: state.applications
-                      .filter((a) => a.status === 'Under Review')
-                      .map((a) => ({
-                        id: a.id,
-                        name: a.businessName,
-                        value: a.refNumber,
-                        initial: a.businessName[0],
-                        onClick: () => setSelectedApp(a),
-                      })),
-                  },
-                  {
-                    id: 'approved',
-                    title: 'Approved',
-                    countLabel: `${kpis.approvedApps} Apps`,
-                    metricLabel: 'Verified',
-                    color: '#16A34A',
-                    items: state.applications
-                      .filter((a) => a.status === 'Approved')
-                      .map((a) => ({
-                        id: a.id,
-                        name: a.businessName,
-                        value: a.city,
-                        initial: a.businessName[0],
-                        onClick: () => setSelectedApp(a),
-                      })),
-                  },
-                  {
-                    id: 'active',
-                    title: 'Active Tenants',
-                    countLabel: `${state.tenants.filter((t) => t.status === 'Active').length} Live`,
-                    metricLabel: `${state.tenants.reduce(
-                      (s, t) => s + t.monthlyTransactions,
-                      0
-                    )} Tx`,
-                    color: '#1E396A',
-                    items: state.tenants
-                      .filter((t) => t.status === 'Active')
-                      .slice(0, 3)
-                      .map((t) => ({
-                        id: t.id,
-                        name: t.businessName,
-                        value: `${t.monthlyTransactions} tx/mo`,
-                        initial: t.businessName[0],
-                        onClick: () => setSelectedTenant(t),
-                      })),
-                    moreCount: Math.max(
-                      0,
-                      state.tenants.filter((t) => t.status === 'Active').length - 3
-                    ),
-                  },
-                  {
-                    id: 'suspended',
-                    title: 'Suspended / Held',
-                    countLabel: `${
-                      state.tenants.filter((t) => t.status === 'Suspended').length +
-                      kpis.rejectedApps
-                    } Items`,
-                    metricLabel: 'Attention',
-                    color: '#F05D21',
-                    items: [
-                      ...state.tenants
-                        .filter((t) => t.status === 'Suspended')
-                        .map((t) => ({
-                          id: t.id,
-                          name: t.businessName,
-                          value: 'Suspended',
-                          initial: t.businessName[0],
-                          onClick: () => setSelectedTenant(t),
-                        })),
-                      ...state.applications
-                        .filter((a) => a.status === 'Rejected')
-                        .map((a) => ({
-                          id: a.id,
-                          name: a.businessName,
-                          value: 'Rejected',
-                          initial: a.businessName[0],
-                          onClick: () => setSelectedApp(a),
-                        })),
-                    ],
-                  },
-                ]}
-              />
-            </div>
-
-            <div className="lg:col-span-5">
-              <TargetProgressCard
-                title="Annual Onboarding Target"
-                actionLabel="View Report"
-                onAction={() => setActivePage('reports')}
-                targetLabel="Annual Target"
-                targetValue="10 Tenants"
-                achievedValue={`${kpis.totalTenants} Tenants`}
-                remainingValue={`${Math.max(0, 10 - kpis.totalTenants)} Remaining`}
-                percentage={Math.min(100, Math.round((kpis.totalTenants / 10) * 100))}
-                gaugeCaption="of annual target"
-                bars={tenantGrowthData.map((d) => ({
-                  label: d.label,
-                  value: d.value + (d.secondaryValue || 0),
-                }))}
-              />
-            </div>
-          </div>
-
-          {/* Nexora 3-Column Analytical Row */}
+          {/* 3-Column Analytical Row */}
           <div className="grid lg:grid-cols-12 gap-5">
             <div className="lg:col-span-4 bg-white dark:bg-[#111B2E] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between">
               <div className="flex items-center justify-between gap-2 mb-4">
@@ -983,63 +1105,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Nexora Bottom Row: Activity Timeline + Growth Forecast */}
-          <div className="grid lg:grid-cols-12 gap-5">
-            <div className="lg:col-span-7">
-              <ActivityTimelineCard
-                title="Platform Activity Timeline"
-                actionLabel="View All"
-                onAction={() => setActivePage('audit_logs')}
-                events={state.auditLogs.slice(0, 5).map((log, idx) => ({
-                  id: log.id,
-                  title: log.action.replace(/_/g, ' '),
-                  subtitle: log.resourceId,
-                  time: log.timestamp.slice(11),
-                  icon:
-                    idx % 3 === 0 ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : idx % 3 === 1 ? (
-                      <ShieldCheck className="h-4 w-4" />
-                    ) : (
-                      <Activity className="h-4 w-4" />
-                    ),
-                  color: idx === 0 ? '#F05D21' : idx % 2 === 1 ? '#1E396A' : '#396BA4',
-                }))}
-              />
-            </div>
+          {/* Recently Actions (Super Admin Platform Governance) */}
+          <RecentlyActionsCard
+            title="Recently Actions"
+            subtitle="Latest platform governance, onboarding, tenant, and account actions"
+            activities={superAdminActivities}
+            maxItems={6}
+            viewAllLabel="View All"
+            onViewAll={() => setActivePage('audit_logs')}
+          />
 
-            <div className="lg:col-span-5">
-              <ForecastCard
-                title="Transaction Volume Forecast"
-                actionLabel="View Report"
-                onAction={() => setActivePage('reports')}
-                primaryLabel="Monthly Platform Tx"
-                primaryValue={`${state.tenants.reduce(
-                  (s, t) => s + t.monthlyTransactions,
-                  0
-                )} Tx`}
-                trendText="↑ 16.4% vs last month"
-                secondaryLabel="Projected Q1"
-                secondaryValue="1,850 Tx"
-                tertiaryLabel="Active Accounts"
-                tertiaryValue={`${state.accounts.length} Admins`}
-                badgeText={`${state.tenants.reduce(
-                  (s, t) => s + t.monthlyTransactions,
-                  0
-                )} Active`}
-                points={[
-                  { label: 'Jul', value: 420 },
-                  { label: 'Aug', value: 580 },
-                  { label: 'Sep', value: 740 },
-                  { label: 'Oct', value: 960 },
-                  {
-                    label: 'Nov',
-                    value: state.tenants.reduce((s, t) => s + t.monthlyTransactions, 0),
-                  },
-                ]}
-              />
-            </div>
-          </div>
         </div>
       )}
 
@@ -1289,7 +1364,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           )}
           {reportTab === 'activity' && (
             <DataTable
-              data={state.auditLogs}
+              data={superAdminActivities}
               columns={auditColumns}
               keyExtractor={(l) => l.id}
             />
@@ -1339,7 +1414,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
       {activePage === 'audit_logs' && (
         <DataTable
-          data={state.auditLogs}
+          data={superAdminActivities}
           columns={auditColumns}
           keyExtractor={(l) => l.id}
           searchPlaceholder="Search actor, action, resource, description..."
@@ -2160,6 +2235,814 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </div>
         )}
       </Modal>
+
+      {/* Edit Application Modal */}
+      <Modal
+        open={editingApp !== null}
+        onClose={() => setEditingApp(null)}
+        title={`Edit Application — ${editingApp?.refNumber || ''}`}
+        maxWidthClass="max-w-xl"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingApp(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!editAppForm.businessName.trim() || !editAppForm.ownerName.trim()}
+              onClick={() => {
+                if (!editingApp) return;
+                updateApplication(editingApp.id, {
+                  businessName: editAppForm.businessName.trim(),
+                  businessType: editAppForm.businessType,
+                  ownerName: editAppForm.ownerName.trim(),
+                  email: editAppForm.email.trim(),
+                  phone: editAppForm.phone.trim(),
+                  city: editAppForm.city.trim(),
+                  address: editAppForm.address.trim(),
+                  registrationNumber: editAppForm.registrationNumber.trim(),
+                  licenseNumber: editAppForm.licenseNumber.trim(),
+                  facilityDetail: editAppForm.facilityDetail.trim(),
+                  notes: editAppForm.notes.trim(),
+                });
+                showToast(`Updated application ${editingApp.refNumber}.`);
+                setEditingApp(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold disabled:opacity-40"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Business Name *
+              </label>
+              <input
+                type="text"
+                value={editAppForm.businessName}
+                onChange={(e) => setEditAppForm({ ...editAppForm, businessName: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Business Type
+              </label>
+              <select
+                value={editAppForm.businessType}
+                onChange={(e) =>
+                  setEditAppForm({ ...editAppForm, businessType: e.target.value as BusinessType })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="Pharmacy">Pharmacy</option>
+                <option value="Pharmaceutical">Pharmaceutical</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Owner Name *
+              </label>
+              <input
+                type="text"
+                value={editAppForm.ownerName}
+                onChange={(e) => setEditAppForm({ ...editAppForm, ownerName: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={editAppForm.email}
+                onChange={(e) => setEditAppForm({ ...editAppForm, email: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={editAppForm.phone}
+                onChange={(e) => setEditAppForm({ ...editAppForm, phone: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                City
+              </label>
+              <input
+                type="text"
+                value={editAppForm.city}
+                onChange={(e) => setEditAppForm({ ...editAppForm, city: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Address
+              </label>
+              <input
+                type="text"
+                value={editAppForm.address}
+                onChange={(e) => setEditAppForm({ ...editAppForm, address: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Commercial Registration #
+              </label>
+              <input
+                type="text"
+                value={editAppForm.registrationNumber}
+                onChange={(e) =>
+                  setEditAppForm({ ...editAppForm, registrationNumber: e.target.value })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg font-mono bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                MOH License #
+              </label>
+              <input
+                type="text"
+                value={editAppForm.licenseNumber}
+                onChange={(e) => setEditAppForm({ ...editAppForm, licenseNumber: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg font-mono bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Notes
+            </label>
+            <textarea
+              rows={2}
+              value={editAppForm.notes}
+              onChange={(e) => setEditAppForm({ ...editAppForm, notes: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Tenant Modal */}
+      <Modal
+        open={editingTenant !== null}
+        onClose={() => setEditingTenant(null)}
+        title={`Edit Tenant — ${editingTenant?.code || ''}`}
+        maxWidthClass="max-w-xl"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingTenant(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!editTenantForm.businessName.trim() || !editTenantForm.ownerName.trim()}
+              onClick={() => {
+                if (!editingTenant) return;
+                updateTenant(editingTenant.id, {
+                  businessName: editTenantForm.businessName.trim(),
+                  businessType: editTenantForm.businessType,
+                  ownerName: editTenantForm.ownerName.trim(),
+                  email: editTenantForm.email.trim(),
+                  phone: editTenantForm.phone.trim(),
+                  city: editTenantForm.city.trim(),
+                  address: editTenantForm.address.trim(),
+                  plan: editTenantForm.plan.trim(),
+                  status: editTenantForm.status,
+                });
+                showToast(`Updated tenant ${editTenantForm.businessName.trim()}.`);
+                setEditingTenant(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold disabled:opacity-40"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Business Name *
+              </label>
+              <input
+                type="text"
+                value={editTenantForm.businessName}
+                onChange={(e) =>
+                  setEditTenantForm({ ...editTenantForm, businessName: e.target.value })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Business Type
+              </label>
+              <select
+                value={editTenantForm.businessType}
+                onChange={(e) =>
+                  setEditTenantForm({
+                    ...editTenantForm,
+                    businessType: e.target.value as BusinessType,
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="Pharmacy">Pharmacy</option>
+                <option value="Pharmaceutical">Pharmaceutical</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Owner / Admin *
+              </label>
+              <input
+                type="text"
+                value={editTenantForm.ownerName}
+                onChange={(e) =>
+                  setEditTenantForm({ ...editTenantForm, ownerName: e.target.value })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={editTenantForm.email}
+                onChange={(e) => setEditTenantForm({ ...editTenantForm, email: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={editTenantForm.phone}
+                onChange={(e) => setEditTenantForm({ ...editTenantForm, phone: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                City
+              </label>
+              <input
+                type="text"
+                value={editTenantForm.city}
+                onChange={(e) => setEditTenantForm({ ...editTenantForm, city: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Address
+              </label>
+              <input
+                type="text"
+                value={editTenantForm.address}
+                onChange={(e) => setEditTenantForm({ ...editTenantForm, address: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Subscription Plan
+              </label>
+              <input
+                type="text"
+                value={editTenantForm.plan}
+                onChange={(e) => setEditTenantForm({ ...editTenantForm, plan: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Operational Status
+              </label>
+              <select
+                value={editTenantForm.status}
+                onChange={(e) =>
+                  setEditTenantForm({
+                    ...editTenantForm,
+                    status: e.target.value as TenantStatus,
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="Active">Active</option>
+                <option value="Suspended">Suspended</option>
+                <option value="Pending Setup">Pending Setup</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* View Account Modal */}
+      <Modal
+        open={viewingAccount !== null}
+        onClose={() => setViewingAccount(null)}
+        title={viewingAccount?.fullName || 'Account Details'}
+        subtitle={viewingAccount ? `${viewingAccount.role} · ${viewingAccount.tenantName}` : ''}
+        maxWidthClass="max-w-lg"
+      >
+        {viewingAccount && (
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <span className="font-mono font-semibold text-[#1E396A] dark:text-sky-300">
+                {viewingAccount.email}
+              </span>
+              <StatusLabel label={viewingAccount.status} />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Organization</p>
+                <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {viewingAccount.tenantName}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Assigned Role</p>
+                <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {viewingAccount.role}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Password Policy</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5">
+                  {viewingAccount.requirePasswordChange ? 'Change required on next login' : 'Compliant'}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Last Login</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200 tabular-nums mt-0.5">
+                  {viewingAccount.lastLoginAt}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Account Modal */}
+      <Modal
+        open={editingAccount !== null}
+        onClose={() => setEditingAccount(null)}
+        title={`Edit Administrator Account`}
+        subtitle={editingAccount?.email || ''}
+        maxWidthClass="max-w-lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingAccount(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!editAccountForm.fullName.trim() || !editAccountForm.email.includes('@')}
+              onClick={() => {
+                if (!editingAccount) return;
+                const matchedTenant = state.tenants.find((t) => t.id === editAccountForm.tenantId);
+                updateAccount(editingAccount.id, {
+                  tenantId: editAccountForm.tenantId,
+                  tenantName:
+                    matchedTenant?.businessName ||
+                    (editAccountForm.role === 'Super Admin'
+                      ? "MI'AH ICT Solutions"
+                      : editingAccount.tenantName),
+                  fullName: editAccountForm.fullName.trim(),
+                  email: editAccountForm.email.trim(),
+                  role: editAccountForm.role,
+                  status: editAccountForm.status,
+                  requirePasswordChange: editAccountForm.requirePasswordChange,
+                });
+                showToast(`Updated account for ${editAccountForm.fullName.trim()}.`);
+                setEditingAccount(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold disabled:opacity-40"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Full Name *
+            </label>
+            <input
+              type="text"
+              value={editAccountForm.fullName}
+              onChange={(e) => setEditAccountForm({ ...editAccountForm, fullName: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Work Email *
+            </label>
+            <input
+              type="email"
+              value={editAccountForm.email}
+              onChange={(e) => setEditAccountForm({ ...editAccountForm, email: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Role
+              </label>
+              <select
+                value={editAccountForm.role}
+                onChange={(e) =>
+                  setEditAccountForm({
+                    ...editAccountForm,
+                    role: e.target.value as 'Pharmacy Admin' | 'Pharmaceutical Admin' | 'Super Admin',
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="Pharmacy Admin">Pharmacy Admin</option>
+                <option value="Pharmaceutical Admin">Pharmaceutical Admin</option>
+                <option value="Super Admin">Super Admin</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Status
+              </label>
+              <select
+                value={editAccountForm.status}
+                onChange={(e) =>
+                  setEditAccountForm({
+                    ...editAccountForm,
+                    status: e.target.value as AccountStatus,
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="Active">Active</option>
+                <option value="Pending Password Change">Pending Password Change</option>
+                <option value="Locked">Locked</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Tenant Organization
+            </label>
+            <select
+              value={editAccountForm.tenantId}
+              onChange={(e) => setEditAccountForm({ ...editAccountForm, tenantId: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            >
+              <option value="platform">MI&apos;AH ICT Solutions (Platform)</option>
+              {state.tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.businessName} ({t.businessType})
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={editAccountForm.requirePasswordChange}
+              onChange={(e) =>
+                setEditAccountForm({
+                  ...editAccountForm,
+                  requirePasswordChange: e.target.checked,
+                })
+              }
+            />
+            Require password change on next login
+          </label>
+        </div>
+      </Modal>
+
+      {/* View Document Modal */}
+      <Modal
+        open={viewingFile !== null}
+        onClose={() => setViewingFile(null)}
+        title={viewingFile?.fileName || 'Document Details'}
+        subtitle={viewingFile ? `${viewingFile.category} · ${viewingFile.size}` : ''}
+        maxWidthClass="max-w-lg"
+      >
+        {viewingFile && (
+          <div className="space-y-4 text-xs">
+            <div className="p-4 rounded-xl bg-[#F4F6F9] dark:bg-[#0D1628] border border-slate-200 dark:border-slate-700 flex items-center gap-3">
+              <FileText className="h-8 w-8 text-[#396BA4] dark:text-sky-400 shrink-0" />
+              <div>
+                <p className="font-semibold text-slate-900 dark:text-white">{viewingFile.fileName}</p>
+                <p className="text-slate-500 dark:text-slate-400 mt-0.5">
+                  Verified platform compliance artifact · {viewingFile.size}
+                </p>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Tenant / Applicant</p>
+                <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {viewingFile.tenantName}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Category</p>
+                <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {viewingFile.category}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Uploaded Date</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200 tabular-nums mt-0.5">
+                  {viewingFile.uploadedAt}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Document ID</p>
+                <p className="font-mono font-medium text-[#1E396A] dark:text-sky-300 mt-0.5">
+                  {viewingFile.id}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Document Modal */}
+      <Modal
+        open={editingFile !== null}
+        onClose={() => setEditingFile(null)}
+        title="Edit Platform Document Metadata"
+        maxWidthClass="max-w-lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingFile(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!editFileForm.fileName.trim()}
+              onClick={() => {
+                if (!editingFile) return;
+                updatePlatformFile(editingFile.id, {
+                  fileName: editFileForm.fileName.trim(),
+                  category: editFileForm.category,
+                  tenantName: editFileForm.tenantName.trim(),
+                  size: editFileForm.size.trim(),
+                });
+                showToast(`Updated document metadata for ${editFileForm.fileName.trim()}.`);
+                setEditingFile(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold disabled:opacity-40"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Document Name *
+            </label>
+            <input
+              type="text"
+              value={editFileForm.fileName}
+              onChange={(e) => setEditFileForm({ ...editFileForm, fileName: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Category
+              </label>
+              <select
+                value={editFileForm.category}
+                onChange={(e) =>
+                  setEditFileForm({
+                    ...editFileForm,
+                    category: e.target.value as PlatformFileRecord['category'],
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="License">License</option>
+                <option value="Registration">Registration</option>
+                <option value="Lab Report Template">Lab Report Template</option>
+                <option value="Export">Export</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                File Size
+              </label>
+              <input
+                type="text"
+                value={editFileForm.size}
+                onChange={(e) => setEditFileForm({ ...editFileForm, size: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Tenant / Applicant
+            </label>
+            <input
+              type="text"
+              value={editFileForm.tenantName}
+              onChange={(e) => setEditFileForm({ ...editFileForm, tenantName: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* View Audit Event Details Modal */}
+      <Modal
+        open={viewingAudit !== null}
+        onClose={() => setViewingAudit(null)}
+        title="Audit Event Inspection"
+        subtitle={viewingAudit ? `${viewingAudit.action} · ${viewingAudit.timestamp}` : ''}
+        maxWidthClass="max-w-lg"
+      >
+        {viewingAudit && (
+          <div className="space-y-4 text-xs">
+            <div className="p-3 rounded-lg bg-slate-100 dark:bg-[#0D1628] border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <span className="font-mono font-bold text-[#1E396A] dark:text-sky-300">
+                {viewingAudit.action}
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                <Lock className="h-3 w-3" />
+                Immutable Compliance Log
+              </span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Actor</p>
+                <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {viewingAudit.actor}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Actor Role</p>
+                <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                  {viewingAudit.actorRole}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Resource</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5">
+                  {viewingAudit.resource} ({viewingAudit.resourceId})
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Timestamp</p>
+                <p className="font-mono font-medium text-slate-800 dark:text-slate-200 tabular-nums mt-0.5">
+                  {viewingAudit.timestamp}
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-slate-500 dark:text-slate-400">Description</p>
+              <p className="mt-1 p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628] text-slate-700 dark:text-slate-200 leading-relaxed">
+                {viewingAudit.description}
+              </p>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete / Archive Confirmation Modals */}
+      <DeleteConfirmModal
+        open={deleteTargetApp !== null}
+        onClose={() => setDeleteTargetApp(null)}
+        title="Archive & Delete Application"
+        recordType="Tenant Application"
+        recordLabel={
+          deleteTargetApp
+            ? `${deleteTargetApp.refNumber} · ${deleteTargetApp.businessName}`
+            : ''
+        }
+        isSoftDelete
+        warningMessage="Regulatory onboarding applications are archived for compliance before being removed from the active review queue."
+        onConfirm={() => {
+          if (!deleteTargetApp) return;
+          const res = deleteApplication(deleteTargetApp.id);
+          showToast(res.message, res.ok ? 'success' : 'error');
+          setDeleteTargetApp(null);
+        }}
+      />
+
+      <DeleteConfirmModal
+        open={deleteTargetTenant !== null}
+        onClose={() => setDeleteTargetTenant(null)}
+        title="Archive & Delete Tenant Organization"
+        recordType="Tenant Organization"
+        recordLabel={
+          deleteTargetTenant
+            ? `${deleteTargetTenant.code} · ${deleteTargetTenant.businessName}`
+            : ''
+        }
+        isSoftDelete
+        warningMessage="Archiving this tenant removes it from active platform operations, archives linked tenant administrator accounts, and writes an immutable audit log entry."
+        onConfirm={() => {
+          if (!deleteTargetTenant) return;
+          const res = deleteTenant(deleteTargetTenant.id);
+          showToast(res.message, res.ok ? 'success' : 'error');
+          setDeleteTargetTenant(null);
+        }}
+      />
+
+      <DeleteConfirmModal
+        open={deleteTargetAccount !== null}
+        onClose={() => setDeleteTargetAccount(null)}
+        title="Delete Administrator Account"
+        recordType="Administrator Account"
+        recordLabel={
+          deleteTargetAccount
+            ? `${deleteTargetAccount.fullName} (${deleteTargetAccount.email})`
+            : ''
+        }
+        warningMessage="This will revoke access and remove the administrator account from the platform. Protected primary Super Admin accounts cannot be deleted."
+        onConfirm={() => {
+          if (!deleteTargetAccount) return;
+          const res = deleteAccount(deleteTargetAccount.id);
+          showToast(res.message, res.ok ? 'success' : 'error');
+          setDeleteTargetAccount(null);
+        }}
+      />
+
+      <DeleteConfirmModal
+        open={deleteTargetFile !== null}
+        onClose={() => setDeleteTargetFile(null)}
+        title="Archive & Delete Platform Document"
+        recordType="Platform Document"
+        recordLabel={
+          deleteTargetFile
+            ? `${deleteTargetFile.fileName} (${deleteTargetFile.tenantName})`
+            : ''
+        }
+        isSoftDelete
+        warningMessage="Compliance documents are archived in the audit snapshot log before removal from the active file repository."
+        onConfirm={() => {
+          if (!deleteTargetFile) return;
+          const res = deletePlatformFile(deleteTargetFile.id);
+          showToast(res.message, res.ok ? 'success' : 'error');
+          setDeleteTargetFile(null);
+        }}
+      />
     </DashboardShell>
   );
 };

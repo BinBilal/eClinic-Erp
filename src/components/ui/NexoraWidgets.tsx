@@ -77,7 +77,7 @@ export const PipelineCard: React.FC<{
   onAction?: () => void;
   stages: PipelineStage[];
 }> = ({ title, actionLabel = 'View All', onAction, stages }) => (
-  <div className="bg-white dark:bg-[#111B2E] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+  <div className="bg-white dark:bg-[#111B2E] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between h-full">
     <div className="flex items-center justify-between gap-2 mb-4">
       <h2 className="text-sm font-bold text-[#1E396A] dark:text-white">{title}</h2>
       {onAction && (

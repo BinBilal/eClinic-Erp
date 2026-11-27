@@ -90,6 +90,9 @@ export interface AuditLogRecord {
   resourceId: string;
   timestamp: string;
   description: string;
+  scope?: 'super_admin' | 'pharmacy' | 'pharmaceutical';
+  module?: string;
+  status?: 'success' | 'info' | 'warning' | 'danger';
 }
 
 export interface PlatformFileRecord {
@@ -291,6 +294,15 @@ export interface ContactMessageRecord {
   submittedAt: string;
 }
 
+export interface ArchivedRecordEntry {
+  id: string;
+  entity: string;
+  label: string;
+  archivedAt: string;
+  archivedBy: string;
+  snapshot: unknown;
+}
+
 export interface DemoStoreState {
   applications: ApplicationRecord[];
   tenants: TenantRecord[];
@@ -310,4 +322,5 @@ export interface DemoStoreState {
   labRequests: LabRequestRecord[];
   notifications: NotificationRecord[];
   contactMessages: ContactMessageRecord[];
+  archivedItems?: ArchivedRecordEntry[];
 }

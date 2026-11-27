@@ -1,16 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  Edit3,
+  Eye,
   FileText,
   FlaskConical,
   MessageSquare,
   Plus,
   Printer,
   ShieldAlert,
+  Trash2,
   UserPlus,
   XCircle,
 } from 'lucide-react';
 import { ColumnDef, DataTable } from '../../components/ui/DataTable';
+import { DeleteConfirmModal } from '../../components/ui/DeleteConfirmModal';
 import { KpiCard } from '../../components/ui/KpiCard';
 import { Logo } from '../../components/ui/Logo';
 import { Modal } from '../../components/ui/Modal';
@@ -19,14 +23,18 @@ import { useDemoStore } from '../../store/demoStore';
 import { LabRequestRecord, PatientRecord } from '../../types/erp';
 
 interface LaboratoryModuleProps {
-  onToast: (msg: string) => void;
+  onToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
 export const LaboratoryModule: React.FC<LaboratoryModuleProps> = ({ onToast }) => {
   const {
     state,
     registerPatient,
+    updatePatient,
+    deletePatient,
     createLabRequest,
+    updateLabRequest,
+    deleteLabRequest,
     submitLabResult,
     simulateWhatsappDelivery,
   } = useDemoStore();
@@ -39,6 +47,29 @@ export const LaboratoryModule: React.FC<LaboratoryModuleProps> = ({ onToast }) =
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [resultModalReq, setResultModalReq] = useState<LabRequestRecord | null>(null);
   const [reportModalReq, setReportModalReq] = useState<LabRequestRecord | null>(null);
+  const [viewingRequest, setViewingRequest] = useState<LabRequestRecord | null>(null);
+  const [editingRequest, setEditingRequest] = useState<LabRequestRecord | null>(null);
+  const [editRequestForm, setEditRequestForm] = useState({
+    patientId: '',
+    testName: '',
+    testCategory: 'Hematology',
+    status: 'Pending' as 'Pending' | 'Answered',
+    resultValues: '',
+    resultSummary: '',
+    clinicalNotes: '',
+  });
+  const [deleteTargetRequest, setDeleteTargetRequest] = useState<LabRequestRecord | null>(null);
+
+  const [viewingPatient, setViewingPatient] = useState<PatientRecord | null>(null);
+  const [editingPatient, setEditingPatient] = useState<PatientRecord | null>(null);
+  const [editPatientForm, setEditPatientForm] = useState({
+    fullName: '',
+    age: '30',
+    gender: 'Female' as 'Male' | 'Female',
+    phone: '',
+    address: '',
+  });
+  const [deleteTargetPatient, setDeleteTargetPatient] = useState<PatientRecord | null>(null);
 
   // Forms
   const [patientForm, setPatientForm] = useState({
@@ -138,8 +169,37 @@ export const LaboratoryModule: React.FC<LaboratoryModuleProps> = ({ onToast }) =
       header: 'Actions',
       align: 'right',
       render: (r) => (
-        <div className="inline-flex items-center justify-end gap-1.5">
-          {r.status === 'Pending' ? (
+        <div className="inline-flex items-center justify-end gap-1.5 flex-wrap">
+          <button
+            type="button"
+            title="View Request Details"
+            onClick={() => (r.status === 'Answered' ? setReportModalReq(r) : setViewingRequest(r))}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </button>
+          <button
+            type="button"
+            title="Edit Lab Request"
+            onClick={() => {
+              setEditingRequest(r);
+              setEditRequestForm({
+                patientId: r.patientId,
+                testName: r.testName,
+                testCategory: r.testCategory,
+                status: r.status,
+                resultValues: r.resultValues || '',
+                resultSummary: r.resultSummary || '',
+                clinicalNotes: r.clinicalNotes || '',
+              });
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          {r.status === 'Pending' && (
             <button
               type="button"
               onClick={() => {
@@ -150,20 +210,20 @@ export const LaboratoryModule: React.FC<LaboratoryModuleProps> = ({ onToast }) =
                   clinicalNotes: '',
                 });
               }}
-              className="px-2.5 py-1 rounded-md bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-medium"
+              className="px-2 py-1 rounded-md bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-medium"
             >
-              Enter Results
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setReportModalReq(r)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Report &amp; Deliver
+              Results
             </button>
           )}
+          <button
+            type="button"
+            title="Archive / Delete Lab Request"
+            onClick={() => setDeleteTargetRequest(r)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
         </div>
       ),
     },
@@ -207,6 +267,48 @@ export const LaboratoryModule: React.FC<LaboratoryModuleProps> = ({ onToast }) =
       key: 'reg',
       header: 'Registered',
       render: (p) => <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">{p.registeredAt}</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (p) => (
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewingPatient(p)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#1E396A] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingPatient(p);
+              setEditPatientForm({
+                fullName: p.fullName,
+                age: String(p.age),
+                gender: p.gender,
+                phone: p.phone,
+                address: p.address,
+              });
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#396BA4] dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteTargetPatient(p)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-red-200 dark:border-red-900/60 bg-white dark:bg-[#0D1628] text-xs font-medium text-[#DC2626] dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -740,6 +842,418 @@ export const LaboratoryModule: React.FC<LaboratoryModuleProps> = ({ onToast }) =
           );
         })()}
       </Modal>
+
+      {/* View Pending Lab Request Details Modal */}
+      <Modal
+        open={viewingRequest !== null}
+        onClose={() => setViewingRequest(null)}
+        title={`Lab Request — ${viewingRequest?.requestNo || ''}`}
+        subtitle={viewingRequest ? `${viewingRequest.patientName} · ${viewingRequest.testCategory}` : ''}
+        maxWidthClass="max-w-lg"
+        footer={
+          viewingRequest && (
+            <>
+              {viewingRequest.status === 'Pending' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = viewingRequest;
+                    setViewingRequest(null);
+                    setResultModalReq(target);
+                    setResultForm({ resultValues: '', resultSummary: '', clinicalNotes: '' });
+                  }}
+                  className="px-4 py-2 rounded-lg bg-[#F05D21] hover:bg-[#d94f18] text-white text-xs font-semibold"
+                >
+                  Enter Results
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setViewingRequest(null)}
+                className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold"
+              >
+                Close
+              </button>
+            </>
+          )
+        }
+      >
+        {viewingRequest && (
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+              <span className="font-semibold text-slate-700 dark:text-slate-200">{viewingRequest.testName}</span>
+              <StatusLabel label={viewingRequest.status} />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Patient</p>
+                <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{viewingRequest.patientName}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">WhatsApp Contact</p>
+                <p className="font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">{viewingRequest.patientPhone}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Category</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5">{viewingRequest.testCategory}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 dark:text-slate-400">Request Date</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200 tabular-nums mt-0.5">{viewingRequest.requestDate}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Edit Lab Request Modal */}
+      <Modal
+        open={editingRequest !== null}
+        onClose={() => setEditingRequest(null)}
+        title={`Edit Lab Request — ${editingRequest?.requestNo || ''}`}
+        maxWidthClass="max-w-lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingRequest(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!editRequestForm.testName.trim()}
+              onClick={() => {
+                if (!editingRequest) return;
+                updateLabRequest(editingRequest.id, {
+                  patientId: editRequestForm.patientId,
+                  testName: editRequestForm.testName.trim(),
+                  testCategory: editRequestForm.testCategory,
+                  status: editRequestForm.status,
+                  resultValues: editRequestForm.resultValues.trim() || undefined,
+                  resultSummary: editRequestForm.resultSummary.trim() || undefined,
+                  clinicalNotes: editRequestForm.clinicalNotes.trim() || undefined,
+                });
+                onToast(`Updated laboratory request ${editingRequest.requestNo}.`);
+                setEditingRequest(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold disabled:opacity-40"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Patient
+            </label>
+            <select
+              value={editRequestForm.patientId}
+              onChange={(e) => setEditRequestForm({ ...editRequestForm, patientId: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            >
+              {state.patients.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.fullName} ({p.patientCode})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Test Name *
+              </label>
+              <input
+                type="text"
+                value={editRequestForm.testName}
+                onChange={(e) => setEditRequestForm({ ...editRequestForm, testName: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Category
+              </label>
+              <select
+                value={editRequestForm.testCategory}
+                onChange={(e) => setEditRequestForm({ ...editRequestForm, testCategory: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="Hematology">Hematology</option>
+                <option value="Clinical Chemistry">Clinical Chemistry</option>
+                <option value="Microbiology">Microbiology</option>
+                <option value="Immunology">Immunology</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Lab Status
+            </label>
+            <select
+              value={editRequestForm.status}
+              onChange={(e) =>
+                setEditRequestForm({
+                  ...editRequestForm,
+                  status: e.target.value as 'Pending' | 'Answered',
+                })
+              }
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            >
+              <option value="Pending">Pending</option>
+              <option value="Answered">Answered</option>
+            </select>
+          </div>
+          {editRequestForm.status === 'Answered' && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Measured Test Values
+                </label>
+                <input
+                  type="text"
+                  value={editRequestForm.resultValues}
+                  onChange={(e) =>
+                    setEditRequestForm({ ...editRequestForm, resultValues: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg font-mono bg-white dark:bg-[#0D1628] dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Result Summary
+                </label>
+                <textarea
+                  rows={2}
+                  value={editRequestForm.resultSummary}
+                  onChange={(e) =>
+                    setEditRequestForm({ ...editRequestForm, resultSummary: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Clinical Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={editRequestForm.clinicalNotes}
+                  onChange={(e) =>
+                    setEditRequestForm({ ...editRequestForm, clinicalNotes: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* View Patient Profile Modal */}
+      <Modal
+        open={viewingPatient !== null}
+        onClose={() => setViewingPatient(null)}
+        title={viewingPatient?.fullName || 'Patient Profile'}
+        subtitle={viewingPatient ? `${viewingPatient.patientCode} · Registered ${viewingPatient.registeredAt}` : ''}
+        maxWidthClass="max-w-lg"
+      >
+        {viewingPatient && (() => {
+          const patientTests = state.labRequests.filter((r) => r.patientId === viewingPatient.id);
+          return (
+            <div className="space-y-4 text-xs">
+              <div className="grid sm:grid-cols-2 gap-3 p-3.5 rounded-lg bg-[#F4F6F9] dark:bg-[#0D1628]">
+                <div>
+                  <p className="text-slate-500 dark:text-slate-400">Demographics</p>
+                  <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                    {viewingPatient.age} yrs · {viewingPatient.gender}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-slate-500 dark:text-slate-400">WhatsApp Phone</p>
+                  <p className="font-semibold text-slate-900 dark:text-white tabular-nums mt-0.5">
+                    {viewingPatient.phone}
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-slate-500 dark:text-slate-400">Address</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5">
+                    {viewingPatient.address}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <p className="font-semibold text-[#1E396A] dark:text-white mb-2">
+                  Laboratory History ({patientTests.length})
+                </p>
+                {patientTests.length === 0 ? (
+                  <p className="text-slate-500 dark:text-slate-400">No laboratory requests recorded for this patient.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {patientTests.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">{t.testName}</p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {t.requestNo} · {t.requestDate}
+                          </p>
+                        </div>
+                        <StatusLabel label={t.status} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Edit Patient Modal */}
+      <Modal
+        open={editingPatient !== null}
+        onClose={() => setEditingPatient(null)}
+        title={`Edit Patient — ${editingPatient?.patientCode || ''}`}
+        maxWidthClass="max-w-lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingPatient(null)}
+              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#0D1628]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!editPatientForm.fullName.trim() || !editPatientForm.phone.trim()}
+              onClick={() => {
+                if (!editingPatient) return;
+                updatePatient(editingPatient.id, {
+                  fullName: editPatientForm.fullName.trim(),
+                  age: Number(editPatientForm.age) || 25,
+                  gender: editPatientForm.gender,
+                  phone: editPatientForm.phone.trim(),
+                  address: editPatientForm.address.trim() || 'Mogadishu',
+                });
+                onToast(`Updated patient profile for ${editPatientForm.fullName.trim()}.`);
+                setEditingPatient(null);
+              }}
+              className="px-4 py-2 rounded-lg bg-[#1E396A] text-white text-xs font-semibold disabled:opacity-40"
+            >
+              Save Changes
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Patient Full Name *
+            </label>
+            <input
+              type="text"
+              value={editPatientForm.fullName}
+              onChange={(e) => setEditPatientForm({ ...editPatientForm, fullName: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Age</label>
+              <input
+                type="number"
+                value={editPatientForm.age}
+                onChange={(e) => setEditPatientForm({ ...editPatientForm, age: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg tabular-nums bg-white dark:bg-[#0D1628] dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Gender</label>
+              <select
+                value={editPatientForm.gender}
+                onChange={(e) =>
+                  setEditPatientForm({
+                    ...editPatientForm,
+                    gender: e.target.value as 'Male' | 'Female',
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+              >
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Phone / WhatsApp *
+            </label>
+            <input
+              type="tel"
+              value={editPatientForm.phone}
+              onChange={(e) => setEditPatientForm({ ...editPatientForm, phone: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Address</label>
+            <input
+              type="text"
+              value={editPatientForm.address}
+              onChange={(e) => setEditPatientForm({ ...editPatientForm, address: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-[#0D1628] dark:text-white"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <DeleteConfirmModal
+        open={deleteTargetRequest !== null}
+        onClose={() => setDeleteTargetRequest(null)}
+        title="Archive & Delete Lab Request"
+        recordType="Laboratory Request"
+        recordLabel={
+          deleteTargetRequest
+            ? `${deleteTargetRequest.requestNo} · ${deleteTargetRequest.patientName} (${deleteTargetRequest.testName})`
+            : ''
+        }
+        isSoftDelete
+        warningMessage="Clinical diagnostic records are archived for medical compliance before removal from the active lab queue."
+        onConfirm={() => {
+          if (!deleteTargetRequest) return;
+          const res = deleteLabRequest(deleteTargetRequest.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+          setDeleteTargetRequest(null);
+        }}
+      />
+
+      <DeleteConfirmModal
+        open={deleteTargetPatient !== null}
+        onClose={() => setDeleteTargetPatient(null)}
+        title="Archive & Delete Patient Record"
+        recordType="Laboratory Patient"
+        recordLabel={
+          deleteTargetPatient
+            ? `${deleteTargetPatient.patientCode} · ${deleteTargetPatient.fullName}`
+            : ''
+        }
+        isSoftDelete
+        warningMessage="Archiving this patient removes their profile and linked laboratory requests from active queues while preserving a clinical archive snapshot."
+        onConfirm={() => {
+          if (!deleteTargetPatient) return;
+          const res = deletePatient(deleteTargetPatient.id);
+          onToast(res.message, res.ok ? 'success' : 'error');
+          setDeleteTargetPatient(null);
+        }}
+      />
     </div>
   );
 };

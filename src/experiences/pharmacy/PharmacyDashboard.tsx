@@ -17,6 +17,7 @@ import {
   Truck,
   Users,
   Wallet,
+  XCircle,
 } from 'lucide-react';
 import {
   BatchExpiryView,
@@ -35,16 +36,15 @@ import {
 } from '../../components/erp/PartnersAndPurchasesViews';
 import { DonutOverviewChart } from '../../components/ui/Charts';
 import { DashboardShell, SidebarNavItem } from '../../components/ui/DashboardShell';
+import { FinanceOverviewCard } from '../../components/ui/FinanceOverviewCard';
 import { KpiCard } from '../../components/ui/KpiCard';
 import {
-  ActivityTimelineCard,
-  ForecastCard,
   GreetingHeader,
   LeaderboardCard,
   PipelineCard,
   RemindersCard,
-  TargetProgressCard,
 } from '../../components/ui/NexoraWidgets';
+import { RecentlyActionsCard } from '../../components/ui/RecentlyActionsCard';
 import { TODAY_ISO } from '../../data/seedData';
 import { getBatchStatus, useDemoStore } from '../../store/demoStore';
 import { ExperienceRole } from '../../types/erp';
@@ -118,11 +118,11 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({
   const [activePage, setActivePage] = useState<PharmacyPage>('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
   const [dateRange, setDateRange] = useState('Nov 19 – Nov 26, 2026');
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 4000);
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message: msg, type });
+    setTimeout(() => setToast(null), 4500);
   };
 
   const pharmacyNotifications = useMemo(
@@ -150,9 +150,25 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({
     () => state.suppliers.filter((s) => s.tenantScope === 'pharmacy'),
     [state.suppliers]
   );
-  const pharmacyMovements = useMemo(
-    () => state.stockMovements.filter((m) => m.tenantScope === 'pharmacy'),
-    [state.stockMovements]
+  const pharmacyExpenses = useMemo(
+    () => state.expenses.filter((e) => e.tenantScope === 'pharmacy'),
+    [state.expenses]
+  );
+  const pharmacyActivities = useMemo(
+    () =>
+      state.auditLogs.filter(
+        (l) => l.scope === 'pharmacy' || (!l.scope && l.actorRole === 'Pharmacy Admin')
+      ),
+    [state.auditLogs]
+  );
+
+  const liveSalesTotal = useMemo(
+    () => pharmacySales.reduce((sum, s) => sum + s.total, 0),
+    [pharmacySales]
+  );
+  const liveExpensesTotal = useMemo(
+    () => pharmacyExpenses.reduce((sum, e) => sum + e.amount, 0),
+    [pharmacyExpenses]
   );
 
   // 9 Required Pharmacy Dashboard KPIs
@@ -193,16 +209,6 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({
     state.labRequests,
     state.systemConfig.expiryAlertDays,
   ]);
-
-  const salesChartData = [
-    { label: 'Mon', value: 185 },
-    { label: 'Tue', value: 240 },
-    { label: 'Wed', value: 162 },
-    { label: 'Thu', value: 295 },
-    { label: 'Fri', value: 218 },
-    { label: 'Sat', value: 310 },
-    { label: 'Today', value: Math.round(kpis.todaysSales) },
-  ];
 
   return (
     <DashboardShell
@@ -256,16 +262,30 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({
         showToast('Original sample data restored.');
       }}
     >
-      {toastMsg && (
-        <div className="mb-5 px-4 py-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-900/70 flex items-center justify-between text-xs font-medium text-emerald-900 dark:text-emerald-200">
+      {toast && (
+        <div
+          className={`mb-5 px-4 py-3 rounded-lg border flex items-center justify-between text-xs font-medium ${
+            toast.type === 'error'
+              ? 'bg-red-50 dark:bg-red-950/60 border-red-200 dark:border-red-900/70 text-red-900 dark:text-red-200'
+              : 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-900/70 text-emerald-900 dark:text-emerald-200'
+          }`}
+        >
           <span className="inline-flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-[#16A34A] dark:text-emerald-400" />
-            {toastMsg}
+            {toast.type === 'error' ? (
+              <XCircle className="h-4 w-4 text-[#DC2626] dark:text-red-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-[#16A34A] dark:text-emerald-400 shrink-0" />
+            )}
+            {toast.message}
           </span>
           <button
             type="button"
-            onClick={() => setToastMsg(null)}
-            className="text-emerald-700 dark:text-emerald-300 hover:underline"
+            onClick={() => setToast(null)}
+            className={
+              toast.type === 'error'
+                ? 'text-red-700 dark:text-red-300 hover:underline'
+                : 'text-emerald-700 dark:text-emerald-300 hover:underline'
+            }
           >
             Dismiss
           </button>
@@ -368,110 +388,101 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({
             />
           </div>
 
-          {/* Nexora Middle Row: 5-Stage Pharmacy & Lab Pipeline + Monthly Sales Progress */}
-          <div className="grid lg:grid-cols-12 gap-5">
-            <div className="lg:col-span-7">
-              <PipelineCard
-                title="Pharmacy & Lab Operations Pipeline"
-                actionLabel="Open POS"
-                onAction={() => setActivePage('sales_pos')}
-                stages={[
-                  {
-                    id: 'low_stock',
-                    title: 'Low Stock',
-                    countLabel: `${kpis.lowStockProducts.length} Items`,
-                    metricLabel: 'Reorder Now',
-                    color: '#D97706',
-                    items: kpis.lowStockProducts.map((p) => ({
-                      id: p.id,
-                      name: p.name,
-                      value: `${p.stockQty} ${p.unit} left`,
-                      initial: p.name[0],
-                      onClick: () => setActivePage('inventory'),
-                    })),
-                  },
-                  {
-                    id: 'expiry',
-                    title: 'Expiry Alerts',
-                    countLabel: `${kpis.nearExpiryBatches.length} Batches`,
-                    metricLabel: 'Quarantine',
-                    color: '#DC2626',
-                    items: kpis.nearExpiryBatches.map((b) => ({
-                      id: b.id,
-                      name: b.productName,
-                      value: `${b.batchNumber} · ${b.expiryDate}`,
-                      initial: b.productName[0],
-                      onClick: () => setActivePage('batch_expiry'),
-                    })),
-                  },
-                  {
-                    id: 'lab_pending',
-                    title: 'Lab Pending',
-                    countLabel: `${kpis.pendingLab} Tests`,
-                    metricLabel: 'Result Entry',
-                    color: '#396BA4',
-                    items: state.labRequests
-                      .filter((r) => r.status === 'Pending')
-                      .map((r) => ({
-                        id: r.id,
-                        name: r.patientName,
-                        value: r.testName,
-                        initial: r.patientName[0],
-                        onClick: () => setActivePage('lab_reports'),
-                      })),
-                  },
-                  {
-                    id: 'lab_answered',
-                    title: 'Lab Answered',
-                    countLabel: `${kpis.answeredLab} Ready`,
-                    metricLabel: 'WhatsApp',
-                    color: '#16A34A',
-                    items: state.labRequests
-                      .filter((r) => r.status === 'Answered')
-                      .map((r) => ({
-                        id: r.id,
-                        name: r.patientName,
-                        value: r.testName,
-                        initial: r.patientName[0],
-                        onClick: () => setActivePage('lab_reports'),
-                      })),
-                  },
-                  {
-                    id: 'recent_sales',
-                    title: 'Completed POS',
-                    countLabel: `${pharmacySales.length} Sales`,
-                    metricLabel: `$${kpis.monthlySales.toFixed(2)}`,
-                    color: '#1E396A',
-                    items: pharmacySales.slice(0, 3).map((s) => ({
-                      id: s.id,
-                      name: s.customerName,
-                      value: `$${s.total.toFixed(2)} · ${s.paymentMethod}`,
-                      initial: s.customerName[0],
-                      onClick: () => setActivePage('sales_pos'),
-                    })),
-                    moreCount: Math.max(0, pharmacySales.length - 3),
-                  },
-                ]}
-              />
-            </div>
-
-            <div className="lg:col-span-5">
-              <TargetProgressCard
-                title="Monthly Sales Target"
-                actionLabel="View Report"
-                onAction={() => setActivePage('reports')}
-                targetLabel="Monthly Target"
-                targetValue="$1,000.00"
-                achievedValue={`$${kpis.monthlySales.toFixed(2)}`}
-                remainingValue={`$${Math.max(0, 1000 - kpis.monthlySales).toFixed(2)}`}
-                percentage={Math.min(100, Math.round((kpis.monthlySales / 1000) * 100))}
-                gaugeCaption="of monthly target"
-                bars={salesChartData.map((d) => ({ label: d.label, value: d.value }))}
-              />
-            </div>
+          {/* Finance Overview (Dedicated 100% Full-Width Row) */}
+          <div className="w-full">
+            <FinanceOverviewCard
+              tenantScope="pharmacy"
+              liveSalesTotal={liveSalesTotal}
+              liveExpensesTotal={liveExpensesTotal}
+              onViewFinance={() => setActivePage('finance')}
+            />
           </div>
 
-          {/* Nexora 3-Column Row: Payment Overview Donut, Top Products, Alerts & Reminders */}
+          {/* Pharmacy & Lab Operations Pipeline (Full Width) */}
+          <PipelineCard
+            title="Pharmacy &amp; Lab Operations Pipeline"
+            actionLabel="Open POS"
+            onAction={() => setActivePage('sales_pos')}
+            stages={[
+              {
+                id: 'low_stock',
+                title: 'Low Stock',
+                countLabel: `${kpis.lowStockProducts.length} Items`,
+                metricLabel: 'Reorder Now',
+                color: '#D97706',
+                items: kpis.lowStockProducts.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  value: `${p.stockQty} ${p.unit} left`,
+                  initial: p.name[0],
+                  onClick: () => setActivePage('inventory'),
+                })),
+              },
+              {
+                id: 'expiry',
+                title: 'Expiry Alerts',
+                countLabel: `${kpis.nearExpiryBatches.length} Batches`,
+                metricLabel: 'Quarantine',
+                color: '#DC2626',
+                items: kpis.nearExpiryBatches.map((b) => ({
+                  id: b.id,
+                  name: b.productName,
+                  value: `${b.batchNumber} · ${b.expiryDate}`,
+                  initial: b.productName[0],
+                  onClick: () => setActivePage('batch_expiry'),
+                })),
+              },
+              {
+                id: 'lab_pending',
+                title: 'Lab Pending',
+                countLabel: `${kpis.pendingLab} Tests`,
+                metricLabel: 'Result Entry',
+                color: '#396BA4',
+                items: state.labRequests
+                  .filter((r) => r.status === 'Pending')
+                  .map((r) => ({
+                    id: r.id,
+                    name: r.patientName,
+                    value: r.testName,
+                    initial: r.patientName[0],
+                    onClick: () => setActivePage('lab_reports'),
+                  })),
+              },
+              {
+                id: 'lab_answered',
+                title: 'Lab Answered',
+                countLabel: `${kpis.answeredLab} Ready`,
+                metricLabel: 'WhatsApp',
+                color: '#16A34A',
+                items: state.labRequests
+                  .filter((r) => r.status === 'Answered')
+                  .map((r) => ({
+                    id: r.id,
+                    name: r.patientName,
+                    value: r.testName,
+                    initial: r.patientName[0],
+                    onClick: () => setActivePage('lab_reports'),
+                  })),
+              },
+              {
+                id: 'recent_sales',
+                title: 'Completed POS',
+                countLabel: `${pharmacySales.length} Sales`,
+                metricLabel: `$${kpis.monthlySales.toFixed(2)}`,
+                color: '#1E396A',
+                items: pharmacySales.slice(0, 3).map((s) => ({
+                  id: s.id,
+                  name: s.customerName,
+                  value: `$${s.total.toFixed(2)} · ${s.paymentMethod}`,
+                  initial: s.customerName[0],
+                  onClick: () => setActivePage('sales_pos'),
+                })),
+                moreCount: Math.max(0, pharmacySales.length - 3),
+              },
+            ]}
+          />
+
+          {/* 3-Column Row: Payment Overview Donut, Top Products, Alerts & Reminders */}
           <div className="grid lg:grid-cols-12 gap-5">
             <div className="lg:col-span-4 bg-white dark:bg-[#111B2E] border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between">
               <div className="flex items-center justify-between gap-2 mb-4">
@@ -581,57 +592,25 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({
             </div>
           </div>
 
-          {/* Nexora Bottom Row: Activity Timeline + Revenue Forecast */}
-          <div className="grid lg:grid-cols-12 gap-5">
-            <div className="lg:col-span-7">
-              <ActivityTimelineCard
-                title="Pharmacy Activity Timeline"
-                actionLabel="View All"
-                onAction={() => setActivePage('inventory')}
-                events={pharmacyMovements.slice(0, 5).map((m, idx) => ({
-                  id: m.id,
-                  title: m.type,
-                  subtitle: `${m.productName} (${m.qtyChange >= 0 ? `+${m.qtyChange}` : m.qtyChange})`,
-                  time: m.date,
-                  icon:
-                    m.qtyChange >= 0 ? (
-                      <Package className="h-4 w-4" />
-                    ) : (
-                      <ShoppingCart className="h-4 w-4" />
-                    ),
-                  color: idx === 0 ? '#F05D21' : m.qtyChange >= 0 ? '#16A34A' : '#1E396A',
-                }))}
-              />
-            </div>
+          {/* Recently Actions (Pharmacy Tenant Isolated) */}
+          <RecentlyActionsCard
+            title="Recently Actions"
+            subtitle="Latest pharmacy sales, catalog, inventory, purchasing, and lab operations"
+            activities={pharmacyActivities}
+            maxItems={6}
+          />
 
-            <div className="lg:col-span-5">
-              <ForecastCard
-                title="Sales Revenue Forecast"
-                actionLabel="View Report"
-                onAction={() => setActivePage('reports')}
-                primaryLabel="Projected Monthly Revenue"
-                primaryValue={`$${(kpis.monthlySales * 1.18).toFixed(2)}`}
-                trendText="↑ 18.0% vs last week"
-                secondaryLabel="Today's POS"
-                secondaryValue={`$${kpis.todaysSales.toFixed(2)}`}
-                tertiaryLabel="Lab Queue"
-                tertiaryValue={`${kpis.answeredLab}/${kpis.totalLab} Done`}
-                badgeText={`$${Math.round(kpis.monthlySales)} MTD`}
-                points={salesChartData.map((d) => ({ label: d.label, value: d.value }))}
-              />
-            </div>
-          </div>
         </div>
       )}
 
       {activePage === 'products' && <ProductsView tenantScope="pharmacy" onToast={showToast} />}
       {activePage === 'inventory' && <InventoryView tenantScope="pharmacy" onToast={showToast} />}
-      {activePage === 'batch_expiry' && <BatchExpiryView tenantScope="pharmacy" />}
+      {activePage === 'batch_expiry' && <BatchExpiryView tenantScope="pharmacy" onToast={showToast} />}
       {activePage === 'sales_pos' && <PharmacyPosView onToast={showToast} />}
       {activePage === 'customers' && <CustomersView tenantScope="pharmacy" onToast={showToast} />}
       {activePage === 'suppliers' && <SuppliersView tenantScope="pharmacy" onToast={showToast} />}
       {activePage === 'purchases' && <PurchasesView tenantScope="pharmacy" onToast={showToast} />}
-      {activePage === 'finance' && <FinanceView tenantScope="pharmacy" />}
+      {activePage === 'finance' && <FinanceView tenantScope="pharmacy" onToast={showToast} />}
       {activePage === 'expenses' && <ExpensesView tenantScope="pharmacy" onToast={showToast} />}
       {activePage === 'lab_reports' && <LaboratoryModule onToast={showToast} />}
       {activePage === 'reports' && <ReportsView tenantScope="pharmacy" onToast={showToast} />}
